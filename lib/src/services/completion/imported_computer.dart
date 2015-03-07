@@ -7,8 +7,8 @@ library services.completion.computer.dart.toplevel;
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:analysis_server/src/protocol_server.dart' hide Element,
-    ElementKind;
+import 'package:analysis_server/src/protocol_server.dart'
+    hide Element, ElementKind;
 import 'package:analysis_server/src/services/completion/dart_completion_cache.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_manager.dart';
 import 'package:analysis_server/src/services/completion/optype.dart';
@@ -22,6 +22,7 @@ import 'package:analyzer/src/generated/element.dart';
  */
 class ImportedComputer extends DartCompletionComputer {
   bool shouldWaitForLowPrioritySuggestions;
+  bool suggestionsComputed;
   _ImportedSuggestionBuilder builder;
 
   ImportedComputer({this.shouldWaitForLowPrioritySuggestions: false});
@@ -29,14 +30,17 @@ class ImportedComputer extends DartCompletionComputer {
   @override
   bool computeFast(DartCompletionRequest request) {
     OpType optype = request.optype;
-    if (optype.includeTopLevelSuggestions) {
-      builder = new _ImportedSuggestionBuilder(
-          request,
-          typesOnly: optype.includeOnlyTypeNameSuggestions,
-          excludeVoidReturn: !optype.includeVoidReturnSuggestions);
+    if (optype.includeReturnValueSuggestions ||
+        optype.includeTypeNameSuggestions ||
+        optype.includeVoidReturnSuggestions ||
+        optype.includeConstructorSuggestions) {
+      builder = new _ImportedSuggestionBuilder(request, optype);
       builder.shouldWaitForLowPrioritySuggestions =
           shouldWaitForLowPrioritySuggestions;
-      return builder.computeFast(request.node);
+      // If target is an argument in an argument list
+      // then suggestions may need to be adjusted
+      suggestionsComputed = builder.computeFast(request.node);
+      return suggestionsComputed && request.target.argIndex == null;
     }
     return true;
   }
@@ -44,9 +48,25 @@ class ImportedComputer extends DartCompletionComputer {
   @override
   Future<bool> computeFull(DartCompletionRequest request) {
     if (builder != null) {
-      return builder.computeFull(request.node);
+      if (!suggestionsComputed) {
+        return builder.computeFull(request.node).then((bool result) {
+          _updateSuggestions(request);
+          return result;
+        });
+      }
+      _updateSuggestions(request);
+      return new Future.value(true);
     }
     return new Future.value(false);
+  }
+
+  /**
+   * If target is a function argument, suggest identifiers not invocations
+   */
+  void _updateSuggestions(DartCompletionRequest request) {
+    if (request.target.isFunctionalArgument()) {
+      request.convertInvocationsToIdentifiers();
+    }
   }
 }
 
@@ -54,16 +74,14 @@ class ImportedComputer extends DartCompletionComputer {
  * [_ImportedSuggestionBuilder] traverses the imports and builds suggestions
  * based upon imported elements.
  */
-class _ImportedSuggestionBuilder extends ElementSuggestionBuilder implements
-    SuggestionBuilder {
+class _ImportedSuggestionBuilder extends ElementSuggestionBuilder
+    implements SuggestionBuilder {
   bool shouldWaitForLowPrioritySuggestions;
   final DartCompletionRequest request;
-  final bool typesOnly;
-  final bool excludeVoidReturn;
+  final OpType optype;
   DartCompletionCache cache;
 
-  _ImportedSuggestionBuilder(this.request, {this.typesOnly: false,
-      this.excludeVoidReturn: false}) {
+  _ImportedSuggestionBuilder(this.request, this.optype) {
     cache = request.cache;
   }
 
@@ -77,8 +95,7 @@ class _ImportedSuggestionBuilder extends ElementSuggestionBuilder implements
   bool computeFast(AstNode node) {
     CompilationUnit unit = request.unit;
     if (cache.isImportInfoCached(unit)) {
-      _addInheritedSuggestions(node);
-      _addTopLevelSuggestions();
+      _addSuggestions(node);
       return true;
     }
     return false;
@@ -88,18 +105,14 @@ class _ImportedSuggestionBuilder extends ElementSuggestionBuilder implements
    * Compute suggested based upon imported elements.
    */
   Future<bool> computeFull(AstNode node) {
-
     Future<bool> addSuggestions(_) {
-      _addInheritedSuggestions(node);
-      _addTopLevelSuggestions();
+      _addSuggestions(node);
       return new Future.value(true);
     }
 
     Future future = null;
     if (!cache.isImportInfoCached(request.unit)) {
-      future = cache.computeImportInfo(
-          request.unit,
-          request.searchEngine,
+      future = cache.computeImportInfo(request.unit, request.searchEngine,
           shouldWaitForLowPrioritySuggestions);
     }
     if (future != null) {
@@ -109,25 +122,61 @@ class _ImportedSuggestionBuilder extends ElementSuggestionBuilder implements
   }
 
   /**
+   * Add constructor and library prefix suggestions from the cache.
+   * To reduce the number of suggestions sent to the client,
+   * filter the suggestions based upon the first character typed.
+   * If no characters are available to use for filtering,
+   * then exclude all low priority suggestions.
+   */
+  void _addConstructorSuggestions() {
+    String filterText = request.filterText;
+    if (filterText.length > 1) {
+      filterText = filterText.substring(0, 1);
+    }
+    DartCompletionCache cache = request.cache;
+    _addFilteredSuggestions(filterText, cache.importedConstructorSuggestions);
+    _addFilteredSuggestions(filterText, cache.libraryPrefixSuggestions);
+  }
+
+  /**
    * Add imported element suggestions.
    */
-  void _addElementSuggestions(List<Element> elements, {int relevance:
-      DART_RELEVANCE_DEFAULT}) {
+  void _addElementSuggestions(List<Element> elements,
+      {int relevance: DART_RELEVANCE_DEFAULT}) {
     elements.forEach((Element elem) {
       if (elem is! ClassElement) {
-        if (typesOnly) {
+        if (optype.includeOnlyTypeNameSuggestions) {
           return;
         }
         if (elem is ExecutableElement) {
           DartType returnType = elem.returnType;
           if (returnType != null && returnType.isVoid) {
-            if (excludeVoidReturn) {
+            if (!optype.includeVoidReturnSuggestions) {
               return;
             }
           }
         }
       }
       addSuggestion(elem, relevance: relevance);
+    });
+  }
+
+  /**
+   * Add suggestions which start with the given text.
+   */
+  _addFilteredSuggestions(
+      String filterText, List<CompletionSuggestion> unfiltered) {
+    //TODO (danrubel) Revisit this filtering once paged API has been added
+    unfiltered.forEach((CompletionSuggestion suggestion) {
+      if (filterText.length > 0) {
+        if (suggestion.completion.startsWith(filterText)) {
+          request.suggestions.add(suggestion);
+        }
+      } else {
+        if (suggestion.relevance != DART_RELEVANCE_LOW) {
+          request.suggestions.add(suggestion);
+        }
+      }
     });
   }
 
@@ -150,30 +199,39 @@ class _ImportedSuggestionBuilder extends ElementSuggestionBuilder implements
         String name = inheritedTypes.removeLast();
         ClassElement elem = cache.importedClassMap[name];
         if (visited.add(name) && elem != null) {
-          _addElementSuggestions(
-              elem.fields,
+          _addElementSuggestions(elem.fields,
               relevance: DART_RELEVANCE_INHERITED_FIELD);
-          _addElementSuggestions(
-              elem.accessors,
+          _addElementSuggestions(elem.accessors,
               relevance: DART_RELEVANCE_INHERITED_ACCESSOR);
-          _addElementSuggestions(
-              elem.methods,
+          _addElementSuggestions(elem.methods,
               relevance: DART_RELEVANCE_INHERITED_METHOD);
           elem.allSupertypes.forEach((InterfaceType type) {
             if (visited.add(type.name) && type.element != null) {
-              _addElementSuggestions(
-                  type.element.fields,
+              _addElementSuggestions(type.element.fields,
                   relevance: DART_RELEVANCE_INHERITED_FIELD);
-              _addElementSuggestions(
-                  type.element.accessors,
+              _addElementSuggestions(type.element.accessors,
                   relevance: DART_RELEVANCE_INHERITED_ACCESSOR);
-              _addElementSuggestions(
-                  type.element.methods,
+              _addElementSuggestions(type.element.methods,
                   relevance: DART_RELEVANCE_INHERITED_METHOD);
             }
           });
         }
       }
+    }
+  }
+
+  /**
+   * Add suggested based upon imported elements.
+   */
+  void _addSuggestions(AstNode node) {
+    if (optype.includeConstructorSuggestions) {
+      _addConstructorSuggestions();
+    }
+    if (optype.includeReturnValueSuggestions ||
+        optype.includeTypeNameSuggestions ||
+        optype.includeVoidReturnSuggestions) {
+      _addInheritedSuggestions(node);
+      _addTopLevelSuggestions();
     }
   }
 
@@ -189,30 +247,16 @@ class _ImportedSuggestionBuilder extends ElementSuggestionBuilder implements
     if (filterText.length > 1) {
       filterText = filterText.substring(0, 1);
     }
-
-    //TODO (danrubel) Revisit this filtering once paged API has been added
-    addFilteredSuggestions(List<CompletionSuggestion> unfiltered) {
-      unfiltered.forEach((CompletionSuggestion suggestion) {
-        if (filterText.length > 0) {
-          if (suggestion.completion.startsWith(filterText)) {
-            request.suggestions.add(suggestion);
-          }
-        } else {
-          if (suggestion.relevance != DART_RELEVANCE_LOW) {
-            request.suggestions.add(suggestion);
-          }
-        }
-      });
-    }
-
     DartCompletionCache cache = request.cache;
-    addFilteredSuggestions(cache.importedTypeSuggestions);
-    addFilteredSuggestions(cache.libraryPrefixSuggestions);
-    if (!typesOnly) {
-      addFilteredSuggestions(cache.otherImportedSuggestions);
-      if (!excludeVoidReturn) {
-        addFilteredSuggestions(cache.importedVoidReturnSuggestions);
-      }
+    if (optype.includeTypeNameSuggestions) {
+      _addFilteredSuggestions(filterText, cache.importedTypeSuggestions);
+      _addFilteredSuggestions(filterText, cache.libraryPrefixSuggestions);
+    }
+    if (optype.includeReturnValueSuggestions) {
+      _addFilteredSuggestions(filterText, cache.otherImportedSuggestions);
+    }
+    if (optype.includeVoidReturnSuggestions) {
+      _addFilteredSuggestions(filterText, cache.importedVoidReturnSuggestions);
     }
   }
 }
