@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:analysis_server/src/services/index/store/split_store.dart';
 import 'package:path/path.dart' as pathos;
 
+
 /**
  * An implementation of [FileManager] that keeps each file in a separate file
  * in a temporary folder.
@@ -47,7 +48,8 @@ class TemporaryFolderFileManager implements FileManager {
     File file = _getFile(name);
     try {
       file.deleteSync();
-    } catch (e) {}
+    } catch (e) {
+    }
   }
 
   @override

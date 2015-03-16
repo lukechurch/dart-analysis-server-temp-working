@@ -13,10 +13,12 @@ import 'package:unittest/unittest.dart';
 import '../analysis_abstract.dart';
 import '../reflective_tests.dart';
 
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(AnalysisNotificationOccurrencesTest);
 }
+
 
 @reflectiveTest
 class AnalysisNotificationOccurrencesTest extends AbstractAnalysisTest {
@@ -60,8 +62,9 @@ class AnalysisNotificationOccurrencesTest extends AbstractAnalysisTest {
       for (int occurrenceOffset in occurrences.offsets) {
         if (occurrenceOffset == offset) {
           if (exists == false) {
-            fail('Not expected to find (offset=$offset; length=$length) in\n'
-                '${occurrencesList.join('\n')}');
+            fail(
+                'Not expected to find (offset=$offset; length=$length) in\n'
+                    '${occurrencesList.join('\n')}');
           }
           testOccurences = occurrences;
           return;
@@ -69,8 +72,9 @@ class AnalysisNotificationOccurrencesTest extends AbstractAnalysisTest {
       }
     }
     if (exists == true) {
-      fail('Expected to find (offset=$offset; length=$length) in\n'
-          '${occurrencesList.join('\n')}');
+      fail(
+          'Expected to find (offset=$offset; length=$length) in\n'
+              '${occurrencesList.join('\n')}');
     }
   }
 

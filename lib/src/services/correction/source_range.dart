@@ -10,6 +10,7 @@ import 'package:analyzer/src/generated/error.dart';
 import 'package:analyzer/src/generated/scanner.dart';
 import 'package:analyzer/src/generated/source.dart';
 
+
 SourceRange rangeElementName(Element element) {
   return new SourceRange(element.nameOffset, element.displayName.length);
 }

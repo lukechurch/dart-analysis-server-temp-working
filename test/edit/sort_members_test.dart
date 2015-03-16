@@ -14,10 +14,12 @@ import '../analysis_abstract.dart';
 import '../mocks.dart';
 import '../reflective_tests.dart';
 
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(SortMembersTest);
 }
+
 
 @reflectiveTest
 class SortMembersTest extends AbstractAnalysisTest {
@@ -35,7 +37,8 @@ class SortMembersTest extends AbstractAnalysisTest {
       Request request =
           new EditSortMembersParams('/no/such/file.dart').toRequest('0');
       Response response = handler.handleRequest(request);
-      expect(response,
+      expect(
+          response,
           isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_INVALID_FILE));
     });
   }
@@ -49,7 +52,8 @@ main() {
     return waitForTasksFinished().then((_) {
       Request request = new EditSortMembersParams(testFile).toRequest('0');
       Response response = handler.handleRequest(request);
-      expect(response,
+      expect(
+          response,
           isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_PARSE_ERRORS));
     });
   }
@@ -59,7 +63,8 @@ main() {
       Request request =
           new EditSortMembersParams('/not-a-Dart-file.txt').toRequest('0');
       Response response = handler.handleRequest(request);
-      expect(response,
+      expect(
+          response,
           isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_INVALID_FILE));
     });
   }

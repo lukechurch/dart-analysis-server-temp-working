@@ -4,9 +4,7 @@
 
 library test.services.completion.toplevel;
 
-import 'package:analysis_server/src/protocol.dart' as protocol
-    show Element, ElementKind;
-import 'package:analysis_server/src/protocol.dart' hide Element, ElementKind;
+import 'package:analysis_server/src/protocol.dart';
 import 'package:analysis_server/src/services/completion/completion_manager.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_cache.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_manager.dart';
@@ -28,6 +26,7 @@ main() {
 
 @reflectiveTest
 class ImportedComputerTest extends AbstractSelectorSuggestionTest {
+
   void assertCached(String completion) {
     DartCompletionCache cache = request.cache;
     if (!isCached(cache.importedTypeSuggestions, completion) &&
@@ -43,9 +42,9 @@ class ImportedComputerTest extends AbstractSelectorSuggestionTest {
    * suggestions to the original set of suggestions.
    */
   @override
-  assertCachedCompute(_) {
+  void assertCachedCompute(_) {
     if (!(computer as ImportedComputer).shouldWaitForLowPrioritySuggestions) {
-      return null;
+      return;
     }
     expect(request.unit.element, isNotNull);
     List<CompletionSuggestion> oldSuggestions = request.suggestions;
@@ -61,49 +60,39 @@ class ImportedComputerTest extends AbstractSelectorSuggestionTest {
     setUpComputer();
     int replacementOffset = request.replacementOffset;
     int replacementLength = request.replacementLength;
-    request = new DartCompletionRequest(context, searchEngine, testSource,
-        completionOffset, cache, new CompletionPerformance());
+    request = new DartCompletionRequest(
+        context,
+        searchEngine,
+        testSource,
+        completionOffset,
+        cache,
+        new CompletionPerformance());
     request.replacementOffset = replacementOffset;
     request.replacementLength = replacementLength;
-
-    void assertResultsFromCache(List<CompletionSuggestion> oldSuggestions) {
-      List<CompletionSuggestion> newSuggestions = request.suggestions;
-      if (newSuggestions.length == oldSuggestions.length) {
-        if (!oldSuggestions
-            .any((CompletionSuggestion s) => !newSuggestions.contains(s))) {
-          return;
-        }
+    expect(computeFast(), isTrue);
+    expect(request.unit.element, isNull);
+    List<CompletionSuggestion> newSuggestions = request.suggestions;
+    if (newSuggestions.length == oldSuggestions.length) {
+      if (!oldSuggestions.any(
+          (CompletionSuggestion s) => !newSuggestions.contains(s))) {
+        return;
       }
-      StringBuffer sb = new StringBuffer(
-          'suggestions based upon cached results do not match expectations');
-      sb.write('\n  Expected:');
-      oldSuggestions.toList()
+    }
+    StringBuffer sb = new StringBuffer(
+        'suggestions based upon cached results do not match expectations');
+    sb.write('\n  Expected:');
+    oldSuggestions.toList()
         ..sort(suggestionComparator)
         ..forEach((CompletionSuggestion suggestion) {
           sb.write('\n    ${suggestion.completion} -> $suggestion');
         });
-      sb.write('\n  Actual:');
-      newSuggestions.toList()
+    sb.write('\n  Actual:');
+    newSuggestions.toList()
         ..sort(suggestionComparator)
         ..forEach((CompletionSuggestion suggestion) {
           sb.write('\n    ${suggestion.completion} -> $suggestion');
         });
-      fail(sb.toString());
-    }
-
-    if (computeFast()) {
-      expect(request.unit.element, isNull);
-      assertResultsFromCache(oldSuggestions);
-    } else {
-      // Results from cache might need to be adjusted
-      // if target is a function argument in an argument list
-      resolve(false);
-      return computer.computeFull(request).then((bool result) {
-        expect(result, isTrue);
-        expect(request.unit.element, isNotNull);
-        assertResultsFromCache(oldSuggestions);
-      });
-    }
+    fail(sb.toString());
   }
 
   void assertNotCached(String completion) {
@@ -117,56 +106,29 @@ class ImportedComputerTest extends AbstractSelectorSuggestionTest {
   }
 
   @override
-  CompletionSuggestion assertSuggestImportedConstructor(String name) {
-    return assertSuggestConstructor(name);
-  }
-
-  @override
   CompletionSuggestion assertSuggestImportedField(String name, String type,
       {int relevance: DART_RELEVANCE_INHERITED_FIELD}) {
     return assertSuggestField(name, type, relevance: relevance);
   }
 
-  @override
-  CompletionSuggestion assertSuggestImportedFunction(
-      String name, String returnType,
-      {CompletionSuggestionKind kind: CompletionSuggestionKind.INVOCATION,
-      bool deprecated: false, int relevance: DART_RELEVANCE_DEFAULT}) {
-    return assertSuggestFunction(name, returnType,
-        kind: kind, deprecated: deprecated, relevance: relevance);
-  }
-
-  CompletionSuggestion assertSuggestImportedGetter(
-      String name, String returnType,
-      {int relevance: DART_RELEVANCE_INHERITED_ACCESSOR}) {
+  CompletionSuggestion assertSuggestImportedGetter(String name,
+      String returnType, {int relevance: DART_RELEVANCE_INHERITED_ACCESSOR}) {
     return assertSuggestGetter(name, returnType, relevance: relevance);
   }
 
-  CompletionSuggestion assertSuggestImportedMethod(
-      String name, String declaringType, String returnType,
-      {int relevance: DART_RELEVANCE_INHERITED_METHOD}) {
-    return assertSuggestMethod(name, declaringType, returnType,
+  CompletionSuggestion assertSuggestImportedMethod(String name,
+      String declaringType, String returnType, {int relevance:
+      DART_RELEVANCE_INHERITED_METHOD}) {
+    return assertSuggestMethod(
+        name,
+        declaringType,
+        returnType,
         relevance: relevance);
   }
 
-  CompletionSuggestion assertSuggestImportedSetter(String name,
-      {int relevance: DART_RELEVANCE_INHERITED_ACCESSOR}) {
+  CompletionSuggestion assertSuggestImportedSetter(String name, {int relevance:
+      DART_RELEVANCE_INHERITED_ACCESSOR}) {
     return assertSuggestSetter(name, relevance);
-  }
-
-  @override
-  CompletionSuggestion assertSuggestLibraryPrefix(String prefix,
-      [int relevance = DART_RELEVANCE_DEFAULT,
-      CompletionSuggestionKind kind = CompletionSuggestionKind.INVOCATION]) {
-    CompletionSuggestion cs =
-        assertSuggest(prefix, csKind: kind, relevance: relevance);
-    protocol.Element element = cs.element;
-    expect(element, isNotNull);
-    expect(element.kind, equals(protocol.ElementKind.LIBRARY));
-    expect(element.parameters, isNull);
-    expect(element.returnType, isNull);
-    assertHasNoParameterInfo(cs);
-    return cs;
   }
 
   bool isCached(List<CompletionSuggestion> suggestions, String completion) =>
@@ -205,7 +167,8 @@ class ImportedComputerTest extends AbstractSelectorSuggestionTest {
   @override
   test_Block() {
     return super.test_Block().then((_) {
-      expect(request.cache.importKey,
+      expect(
+          request.cache.importKey,
           'import "/testAB.dart";import "/testCD.dart" hide D;import "/testEEF.dart" show EE;import "/testG.dart" as g;');
       assertCached('A');
       assertCached('T3');
@@ -390,56 +353,6 @@ class B extends A {
       expect(suggestion.parameterTypes[1], 'int');
       expect(suggestion.requiredParameterCount, 2);
       expect(suggestion.hasNamedParameters, false);
-    });
-  }
-
-  test_InstanceCreationExpression() {
-    addSource('/testA.dart', '''
-class A {foo(){var f; {var x;}}}
-class B {B(this.x, [String boo]) { } int x;}
-class C {C.bar({boo: 'hoo', int z: 0}) { } }''');
-    addTestSource('''
-import "/testA.dart";
-import "dart:math" as math;
-main() {new ^ String x = "hello";}''');
-    computeFast();
-    return computeFull((bool result) {
-      CompletionSuggestion suggestion;
-
-      suggestion = assertSuggestImportedConstructor('Object');
-      expect(suggestion.element.parameters, '()');
-      expect(suggestion.parameterNames, hasLength(0));
-      expect(suggestion.requiredParameterCount, 0);
-      expect(suggestion.hasNamedParameters, false);
-
-      suggestion = assertSuggestImportedConstructor('A');
-      expect(suggestion.element.parameters, '()');
-      expect(suggestion.parameterNames, hasLength(0));
-      expect(suggestion.requiredParameterCount, 0);
-      expect(suggestion.hasNamedParameters, false);
-
-      suggestion = assertSuggestImportedConstructor('B');
-      expect(suggestion.element.parameters, '(int x, [String boo])');
-      expect(suggestion.parameterNames, hasLength(2));
-      expect(suggestion.parameterNames[0], 'x');
-      expect(suggestion.parameterTypes[0], 'int');
-      expect(suggestion.parameterNames[1], 'boo');
-      expect(suggestion.parameterTypes[1], 'String');
-      expect(suggestion.requiredParameterCount, 1);
-      expect(suggestion.hasNamedParameters, false);
-
-      suggestion = assertSuggestImportedConstructor('C.bar');
-      expect(
-          suggestion.element.parameters, "({dynamic boo: 'hoo'}, {int z: 0})");
-      expect(suggestion.parameterNames, hasLength(2));
-      expect(suggestion.parameterNames[0], 'boo');
-      expect(suggestion.parameterTypes[0], 'dynamic');
-      expect(suggestion.parameterNames[1], 'z');
-      expect(suggestion.parameterTypes[1], 'int');
-      expect(suggestion.requiredParameterCount, 0);
-      expect(suggestion.hasNamedParameters, true);
-
-      assertSuggestLibraryPrefix('math');
     });
   }
 
@@ -728,7 +641,8 @@ class B extends A {
   @override
   test_partFile_TypeName2() {
     return super.test_partFile_TypeName2().then((_) {
-      expect(request.cache.importKey,
+      expect(
+          request.cache.importKey,
           'library libA;import "/testB.dart";part "/testA.dart";');
     });
   }

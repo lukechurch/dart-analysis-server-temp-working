@@ -11,6 +11,7 @@ import 'package:analysis_server/src/services/search/element_visitors.dart';
 import 'package:analysis_server/src/services/search/search_engine.dart';
 import 'package:analyzer/src/generated/element.dart';
 
+
 /**
  * Returns direct children of [parent].
  */
@@ -23,6 +24,7 @@ List<Element> getChildren(Element parent, [String name]) {
   });
   return children;
 }
+
 
 /**
  * Returns direct non-synthetic children of the given [ClassElement].
@@ -52,11 +54,12 @@ List<Element> getClassMembers(ClassElement clazz, [String name]) {
   return members;
 }
 
+
 /**
  * Returns a [Set] with direct subclasses of [seed].
  */
-Future<Set<ClassElement>> getDirectSubClasses(
-    SearchEngine searchEngine, ClassElement seed) {
+Future<Set<ClassElement>> getDirectSubClasses(SearchEngine searchEngine,
+    ClassElement seed) {
   return searchEngine.searchSubtypes(seed).then((List<SearchMatch> matches) {
     Set<ClassElement> subClasses = new HashSet<ClassElement>();
     for (SearchMatch match in matches) {
@@ -67,12 +70,13 @@ Future<Set<ClassElement>> getDirectSubClasses(
   });
 }
 
+
 /**
  * @return all implementations of the given {@link ClassMemberElement} is its superclasses and
  *         their subclasses.
  */
-Future<Set<ClassMemberElement>> getHierarchyMembers(
-    SearchEngine searchEngine, ClassMemberElement member) {
+Future<Set<ClassMemberElement>> getHierarchyMembers(SearchEngine searchEngine,
+    ClassMemberElement member) {
   Set<ClassMemberElement> result = new HashSet<ClassMemberElement>();
   // constructor
   if (member is ConstructorElement) {
@@ -110,6 +114,7 @@ Future<Set<ClassMemberElement>> getHierarchyMembers(
   });
 }
 
+
 /**
  * Returns non-synthetic members of the given [ClassElement] and its super
  * classes.
@@ -127,11 +132,12 @@ List<Element> getMembers(ClassElement clazz) {
   return members;
 }
 
+
 /**
  * Returns a [Set] with all direct and indirect subclasses of [seed].
  */
-Future<Set<ClassElement>> getSubClasses(
-    SearchEngine searchEngine, ClassElement seed) {
+Future<Set<ClassElement>> getSubClasses(SearchEngine searchEngine,
+    ClassElement seed) {
   Set<ClassElement> subs = new HashSet<ClassElement>();
   // prepare queue
   List<ClassElement> queue = new List<ClassElement>();
@@ -154,6 +160,7 @@ Future<Set<ClassElement>> getSubClasses(
   }
   return new Future(addSubClasses);
 }
+
 
 /**
  * Returns a [Set] with all direct and indirect superclasses of [seed].
@@ -186,6 +193,7 @@ Set<ClassElement> getSuperClasses(ClassElement seed) {
   result.remove(seed);
   return result;
 }
+
 
 /**
  * If the given [element] is a synthetic [PropertyAccessorElement] returns

@@ -21,7 +21,9 @@ class AnalysisLogger implements Logger {
   AnalysisLogger() {
     logging.Logger.root.onRecord.listen((logging.LogRecord record) {
       AnalysisEngine.instance.instrumentationService.logLogEntry(
-          record.level.name, record.time, record.message);
+          record.level.name,
+          record.time,
+          record.message);
     });
   }
 

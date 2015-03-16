@@ -16,29 +16,28 @@ import 'api.dart';
 import 'html_tools.dart';
 
 const List<String> specialElements = const [
-  'domain',
-  'feedback',
-  'object',
-  'refactorings',
-  'refactoring',
-  'type',
-  'types',
-  'request',
-  'notification',
-  'params',
-  'result',
-  'field',
-  'list',
-  'map',
-  'enum',
-  'key',
-  'value',
-  'options',
-  'ref',
-  'code',
-  'version',
-  'union'
-];
+    'domain',
+    'feedback',
+    'object',
+    'refactorings',
+    'refactoring',
+    'type',
+    'types',
+    'request',
+    'notification',
+    'params',
+    'result',
+    'field',
+    'list',
+    'map',
+    'enum',
+    'key',
+    'value',
+    'options',
+    'ref',
+    'code',
+    'version',
+    'union'];
 
 /**
  * Create an [Api] object from an HTML representation such as:
@@ -87,9 +86,9 @@ Api apiFromHtml(dom.Element html) {
  * [requiredAttributes], possibly some of the attributes in
  * [optionalAttributes], and no others.
  */
-void checkAttributes(
-    dom.Element element, List<String> requiredAttributes, String context,
-    {List<String> optionalAttributes: const []}) {
+void checkAttributes(dom.Element element, List<String> requiredAttributes,
+    String context, {List<String> optionalAttributes: const [
+    ]}) {
   Set<String> attributesFound = new Set<String>();
   element.attributes.forEach((String name, String value) {
     if (!requiredAttributes.contains(name) &&
@@ -291,8 +290,8 @@ Api readApi() {
   return apiFromHtml(document.firstChild);
 }
 
-void recurse(dom.Element parent, String context,
-    Map<String, ElementProcessor> elementProcessors) {
+void recurse(dom.Element parent, String context, Map<String,
+    ElementProcessor> elementProcessors) {
   for (String key in elementProcessors.keys) {
     if (!specialElements.contains(key)) {
       throw new Exception('$context: $key is not a special element');
@@ -477,7 +476,10 @@ TypeObjectField typeObjectFieldFromHtml(dom.Element html, String context) {
   String name = html.attributes['name'];
   context = '$context.${name != null ? name : 'field'}';
   checkAttributes(
-      html, ['name'], context, optionalAttributes: ['optional', 'value']);
+      html,
+      ['name'],
+      context,
+      optionalAttributes: ['optional', 'value']);
   bool optional = false;
   String optionalString = html.attributes['optional'];
   if (optionalString != null) {
@@ -495,8 +497,12 @@ TypeObjectField typeObjectFieldFromHtml(dom.Element html, String context) {
   }
   String value = html.attributes['value'];
   TypeDecl type = processContentsAsType(html, context);
-  return new TypeObjectField(name, type, html,
-      optional: optional, value: value);
+  return new TypeObjectField(
+      name,
+      type,
+      html,
+      optional: optional,
+      value: value);
 }
 
 /**

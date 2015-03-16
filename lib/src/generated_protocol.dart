@@ -10538,8 +10538,7 @@ class ExtractMethodFeedback extends RefactoringFeedback implements HasToJson {
   int length;
 
   /**
-   * The proposed return type for the method. If the returned element does not
-   * have a declared return type, this field will contain an empty string.
+   * The proposed return type for the method.
    */
   String returnType;
 

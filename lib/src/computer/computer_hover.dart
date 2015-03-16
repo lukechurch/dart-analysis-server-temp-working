@@ -8,6 +8,7 @@ import 'package:analysis_server/src/protocol.dart' show HoverInformation;
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/element.dart';
 
+
 /**
  * Converts [str] from a Dart Doc string with slashes and stars to a plain text
  * representation of the comment.
@@ -51,6 +52,7 @@ String _removeDartDocDelimiters(String str) {
   // done
   return str;
 }
+
 
 /**
  * A computer for the hover at the specified offset of a Dart [CompilationUnit].

@@ -16,11 +16,12 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:path/path.dart' as pathos;
 
+
 /**
  * [ExtractLocalRefactoring] implementation.
  */
-class MoveFileRefactoringImpl extends RefactoringImpl
-    implements MoveFileRefactoring {
+class MoveFileRefactoringImpl extends RefactoringImpl implements
+    MoveFileRefactoring {
   final pathos.Context pathContext;
   final SearchEngine searchEngine;
   final AnalysisContext context;
@@ -34,8 +35,8 @@ class MoveFileRefactoringImpl extends RefactoringImpl
   String oldLibraryDir;
   String newLibraryDir;
 
-  MoveFileRefactoringImpl(
-      this.pathContext, this.searchEngine, this.context, this.source) {
+  MoveFileRefactoringImpl(this.pathContext, this.searchEngine, this.context,
+      this.source) {
     oldFile = source.fullName;
   }
 
@@ -146,7 +147,9 @@ class MoveFileRefactoringImpl extends RefactoringImpl
         int uriOffset = element.uriOffset;
         int uriLength = element.uriEnd - uriOffset;
         doSourceChange_addElementEdit(
-            change, library, new SourceEdit(uriOffset, uriLength, "'$newUri'"));
+            change,
+            library,
+            new SourceEdit(uriOffset, uriLength, "'$newUri'"));
       }
     }
   }

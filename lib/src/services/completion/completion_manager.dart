@@ -56,8 +56,8 @@ abstract class CompletionManager {
   /**
    * Create a manager for the given request.
    */
-  factory CompletionManager.create(
-      AnalysisContext context, Source source, SearchEngine searchEngine) {
+  factory CompletionManager.create(AnalysisContext context, Source source,
+      SearchEngine searchEngine) {
     if (context != null) {
       if (AnalysisEngine.isDartFileName(source.shortName)) {
         return new DartCompletionManager.create(context, searchEngine, source);
@@ -95,7 +95,8 @@ abstract class CompletionManager {
    * Discard any pending operations.
    * Subclasses may override but should call super.dispose
    */
-  void dispose() {}
+  void dispose() {
+  }
 
   /**
    * Generate a stream of code completion results.
@@ -186,10 +187,7 @@ class CompletionPerformance {
   }
 
   static String _computeSnippet(String contents, int offset) {
-    if (contents == null ||
-        offset == null ||
-        offset < 0 ||
-        contents.length < offset) {
+    if (contents == null || offset == null || offset < 0 || contents.length < offset) {
       return '???';
     }
     int start = offset;
@@ -267,6 +265,7 @@ class CompletionResult {
 }
 
 class NoOpCompletionManager extends CompletionManager {
+
   NoOpCompletionManager(Source source) : super(null, source);
 
   @override

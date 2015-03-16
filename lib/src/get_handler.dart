@@ -175,7 +175,8 @@ class GetHandler {
       return null;
     }
     return analysisServer.handlers.firstWhere(
-        (h) => h is CompletionDomainHandler, orElse: () => null);
+        (h) => h is CompletionDomainHandler,
+        orElse: () => null);
   }
 
   /**
@@ -218,7 +219,8 @@ class GetHandler {
    */
   Folder _findFolder(AnalysisServer analysisServer, String contextFilter) {
     return analysisServer.folderMap.keys.firstWhere(
-        (Folder folder) => folder.path == contextFilter, orElse: () => null);
+        (Folder folder) => folder.path == contextFilter,
+        orElse: () => null);
   }
 
   /**
@@ -227,8 +229,9 @@ class GetHandler {
    */
   bool _hasException(AnalysisContextImpl context) {
     bool hasException = false;
-    context.visitCacheItems((Source source, SourceEntry sourceEntry,
-        DataDescriptor rowDesc, CacheState state) {
+    context.visitCacheItems(
+        (Source source, SourceEntry sourceEntry, DataDescriptor rowDesc,
+            CacheState state) {
       if (sourceEntry.exception != null) {
         hasException = true;
       }
@@ -240,8 +243,8 @@ class GetHandler {
    * Return the folder in the [folderMap] with which the given [context] is
    * associated.
    */
-  Folder _keyForValue(
-      Map<Folder, AnalysisContext> folderMap, AnalysisContext context) {
+  Folder _keyForValue(Map<Folder, AnalysisContext> folderMap,
+      AnalysisContext context) {
     for (Folder folder in folderMap.keys) {
       if (folderMap[folder] == context) {
         return folder;
@@ -259,15 +262,21 @@ class GetHandler {
       return _returnFailure(request, 'Analysis server is not running');
     }
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Analysis Performance', [],
+      _writePage(
+          buffer,
+          'Analysis Server - Analysis Performance',
+          [],
           (StringBuffer buffer) {
+
         buffer.write('<h3>Analysis Performance</h3>');
 
         {
           buffer.write('<p><b>Time spent in each phase of analysis</b></p>');
           buffer.write(
               '<table style="border-collapse: separate; border-spacing: 10px 5px;">');
-          _writeRow(buffer, ['Time (in ms)', 'Percent', 'Analysis Phase'],
+          _writeRow(
+              buffer,
+              ['Time (in ms)', 'Percent', 'Analysis Phase'],
               header: true);
           // prepare sorted tags
           List<PerformanceTag> tags = PerformanceTag.all.toList();
@@ -282,7 +291,9 @@ class GetHandler {
           void writeRow(PerformanceTag tag) {
             double percent = (tag.elapsedMs * 100) / totalTime;
             String percentStr = '${percent.toStringAsFixed(2)}%';
-            _writeRow(buffer, [tag.elapsedMs, percentStr, tag.label],
+            _writeRow(
+                buffer,
+                [tag.elapsedMs, percentStr, tag.label],
                 classes: ["right", "right", null]);
           }
           tags.forEach(writeRow);
@@ -297,19 +308,23 @@ class GetHandler {
           buffer.write('<p>none</p>');
         } else {
           List<DataDescriptor> descriptors = transitionMap.keys.toList();
-          descriptors.sort((DataDescriptor first, DataDescriptor second) =>
-              first.toString().compareTo(second.toString()));
+          descriptors.sort(
+              (DataDescriptor first, DataDescriptor second) =>
+                  first.toString().compareTo(second.toString()));
           for (DataDescriptor key in descriptors) {
             Map<CacheState, int> countMap = transitionMap[key];
             List<CacheState> oldStates = countMap.keys.toList();
-            oldStates.sort((CacheState first, CacheState second) =>
-                first.toString().compareTo(second.toString()));
+            oldStates.sort(
+                (CacheState first, CacheState second) =>
+                    first.toString().compareTo(second.toString()));
             buffer.write('<p>${key.toString()}</p>');
             buffer.write(
                 '<table style="border-collapse: separate; border-spacing: 10px 5px;">');
             _writeRow(buffer, ['Count', 'Previous State'], header: true);
             for (CacheState state in oldStates) {
-              _writeRow(buffer, [countMap[state], state.toString()],
+              _writeRow(
+                  buffer,
+                  [countMap[state], state.toString()],
                   classes: ["right", null]);
             }
             buffer.write('</table>');
@@ -330,7 +345,8 @@ class GetHandler {
     String contextFilter = request.uri.queryParameters[CONTEXT_QUERY_PARAM];
     if (contextFilter == null) {
       return _returnFailure(
-          request, 'Query parameter $CONTEXT_QUERY_PARAM required');
+          request,
+          'Query parameter $CONTEXT_QUERY_PARAM required');
     }
     Folder folder = _findFolder(analysisServer, contextFilter);
     if (folder == null) {
@@ -339,16 +355,18 @@ class GetHandler {
     String sourceUri = request.uri.queryParameters[SOURCE_QUERY_PARAM];
     if (sourceUri == null) {
       return _returnFailure(
-          request, 'Query parameter $SOURCE_QUERY_PARAM required');
+          request,
+          'Query parameter $SOURCE_QUERY_PARAM required');
     }
 
     AnalysisContextImpl context = analysisServer.folderMap[folder];
 
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - AST Structure', [
-        'Context: $contextFilter',
-        'File: $sourceUri'
-      ], (HttpResponse) {
+      _writePage(
+          buffer,
+          'Analysis Server - AST Structure',
+          ['Context: $contextFilter', 'File: $sourceUri'],
+          (HttpResponse) {
         Source source = context.sourceFactory.forUri(sourceUri);
         if (source == null) {
           buffer.write('<p>Not found.</p>');
@@ -388,7 +406,8 @@ class GetHandler {
     String contextFilter = request.uri.queryParameters[CONTEXT_QUERY_PARAM];
     if (contextFilter == null) {
       return _returnFailure(
-          request, 'Query parameter $CONTEXT_QUERY_PARAM required');
+          request,
+          'Query parameter $CONTEXT_QUERY_PARAM required');
     }
     Folder folder = _findFolder(analysisServer, contextFilter);
     if (folder == null) {
@@ -397,7 +416,8 @@ class GetHandler {
     String sourceUri = request.uri.queryParameters[SOURCE_QUERY_PARAM];
     if (sourceUri == null) {
       return _returnFailure(
-          request, 'Query parameter $SOURCE_QUERY_PARAM required');
+          request,
+          'Query parameter $SOURCE_QUERY_PARAM required');
     }
 
     List<Folder> allContexts = <Folder>[];
@@ -413,15 +433,17 @@ class GetHandler {
         }
       }
     });
-    allContexts.sort((Folder firstFolder, Folder secondFolder) =>
-        firstFolder.path.compareTo(secondFolder.path));
+    allContexts.sort(
+        (Folder firstFolder, Folder secondFolder) =>
+            firstFolder.path.compareTo(secondFolder.path));
     AnalysisContextImpl context = analysisServer.folderMap[folder];
 
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Cache Entry', [
-        'Context: $contextFilter',
-        'File: $sourceUri'
-      ], (HttpResponse) {
+      _writePage(
+          buffer,
+          'Analysis Server - Cache Entry',
+          ['Context: $contextFilter', 'File: $sourceUri'],
+          (HttpResponse) {
         buffer.write('<h3>Analyzing Contexts</h3><p>');
         bool first = true;
         allContexts.forEach((Folder folder) {
@@ -459,13 +481,19 @@ class GetHandler {
         };
 
         buffer.write('<h3>Library Independent</h3>');
-        _writeDescriptorTable(buffer,
-            entry.descriptors, entry.getState, entry.getValue, linkParameters);
+        _writeDescriptorTable(
+            buffer,
+            entry.descriptors,
+            entry.getState,
+            entry.getValue,
+            linkParameters);
         if (entry is DartEntry) {
           for (Source librarySource in entry.containingLibraries) {
             String libraryName = HTML_ESCAPE.convert(librarySource.fullName);
             buffer.write('<h3>In library $libraryName:</h3>');
-            _writeDescriptorTable(buffer, entry.libraryDescriptors,
+            _writeDescriptorTable(
+                buffer,
+                entry.libraryDescriptors,
                 (DataDescriptor descriptor) =>
                     entry.getStateInLibrary(descriptor, librarySource),
                 (DataDescriptor descriptor) =>
@@ -494,13 +522,15 @@ class GetHandler {
     String contextFilter = request.uri.queryParameters[CONTEXT_QUERY_PARAM];
     if (contextFilter == null) {
       return _returnFailure(
-          request, 'Query parameter $CONTEXT_QUERY_PARAM required');
+          request,
+          'Query parameter $CONTEXT_QUERY_PARAM required');
     }
     // Figure out what CacheState is being searched for.
     String stateQueryParam = request.uri.queryParameters[STATE_QUERY_PARAM];
     if (stateQueryParam == null) {
       return _returnFailure(
-          request, 'Query parameter $STATE_QUERY_PARAM required');
+          request,
+          'Query parameter $STATE_QUERY_PARAM required');
     }
     CacheState stateFilter = null;
     for (CacheState value in CacheState.values) {
@@ -510,21 +540,24 @@ class GetHandler {
     }
     if (stateFilter == null) {
       return _returnFailure(
-          request, 'Query parameter $STATE_QUERY_PARAM is invalid');
+          request,
+          'Query parameter $STATE_QUERY_PARAM is invalid');
     }
     // Figure out which descriptor is being searched for.
     String descriptorFilter =
         request.uri.queryParameters[DESCRIPTOR_QUERY_PARAM];
     if (descriptorFilter == null) {
       return _returnFailure(
-          request, 'Query parameter $DESCRIPTOR_QUERY_PARAM required');
+          request,
+          'Query parameter $DESCRIPTOR_QUERY_PARAM required');
     }
 
     Folder folder = _findFolder(analysisServer, contextFilter);
     AnalysisContextImpl context = analysisServer.folderMap[folder];
     List<String> links = <String>[];
-    context.visitCacheItems((Source source, SourceEntry dartEntry,
-        DataDescriptor rowDesc, CacheState state) {
+    context.visitCacheItems(
+        (Source source, SourceEntry dartEntry, DataDescriptor rowDesc, CacheState state)
+            {
       if (state != stateFilter || rowDesc.toString() != descriptorFilter) {
         return;
       }
@@ -536,11 +569,14 @@ class GetHandler {
     });
 
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Cache Search', [
-        'Context: $contextFilter',
-        'Descriptor: ${HTML_ESCAPE.convert(descriptorFilter)}',
-        'State: ${HTML_ESCAPE.convert(stateQueryParam)}'
-      ], (StringBuffer buffer) {
+      _writePage(
+          buffer,
+          'Analysis Server - Cache Search',
+          [
+              'Context: $contextFilter',
+              'Descriptor: ${HTML_ESCAPE.convert(descriptorFilter)}',
+              'State: ${HTML_ESCAPE.convert(stateQueryParam)}'],
+          (StringBuffer buffer) {
         buffer.write('<p>${links.length} files found</p>');
         buffer.write('<ul>');
         links.forEach((String link) {
@@ -560,34 +596,45 @@ class GetHandler {
       return _returnFailure(request, 'Analysis server is not running');
     }
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Communication Performance', [],
+      _writePage(
+          buffer,
+          'Analysis Server - Communication Performance',
+          [],
           (StringBuffer buffer) {
         buffer.write('<h3>Communication Performance</h3>');
         _writeTwoColumns(buffer, (StringBuffer buffer) {
           ServerPerformance perf = analysisServer.performanceDuringStartup;
           int requestCount = perf.requestCount;
-          num averageLatency = requestCount > 0
-              ? (perf.requestLatency / requestCount).round()
-              : 0;
+          num averageLatency =
+              requestCount > 0 ? (perf.requestLatency / requestCount).round() : 0;
           int maximumLatency = perf.maxLatency;
-          num slowRequestPercent = requestCount > 0
-              ? (perf.slowRequestCount * 100 / requestCount).round()
-              : 0;
+          num slowRequestPercent =
+              requestCount > 0 ? (perf.slowRequestCount * 100 / requestCount).round() : 0;
           buffer.write('<h4>Startup</h4>');
           buffer.write('<table>');
           _writeRow(
-              buffer, [requestCount, 'requests'], classes: ["right", null]);
-          _writeRow(buffer, [averageLatency, 'ms average latency'],
+              buffer,
+              [requestCount, 'requests'],
               classes: ["right", null]);
-          _writeRow(buffer, [maximumLatency, 'ms maximum latency'],
+          _writeRow(
+              buffer,
+              [averageLatency, 'ms average latency'],
               classes: ["right", null]);
-          _writeRow(buffer, [slowRequestPercent, '% > 150 ms latency'],
+          _writeRow(
+              buffer,
+              [maximumLatency, 'ms maximum latency'],
+              classes: ["right", null]);
+          _writeRow(
+              buffer,
+              [slowRequestPercent, '% > 150 ms latency'],
               classes: ["right", null]);
           if (analysisServer.performanceAfterStartup != null) {
-            int startupTime = analysisServer.performanceAfterStartup.startTime -
+            int startupTime =
+                analysisServer.performanceAfterStartup.startTime -
                 perf.startTime;
             _writeRow(
-                buffer, [startupTime, 'ms for initial analysis to complete']);
+                buffer,
+                [startupTime, 'ms for initial analysis to complete']);
           }
           buffer.write('</table>');
         }, (StringBuffer buffer) {
@@ -596,22 +643,28 @@ class GetHandler {
             return;
           }
           int requestCount = perf.requestCount;
-          num averageLatency = requestCount > 0
-              ? (perf.requestLatency * 10 / requestCount).round() / 10
-              : 0;
+          num averageLatency =
+              requestCount > 0 ? (perf.requestLatency * 10 / requestCount).round() / 10 : 0;
           int maximumLatency = perf.maxLatency;
-          num slowRequestPercent = requestCount > 0
-              ? (perf.slowRequestCount * 100 / requestCount).round()
-              : 0;
+          num slowRequestPercent =
+              requestCount > 0 ? (perf.slowRequestCount * 100 / requestCount).round() : 0;
           buffer.write('<h4>Current</h4>');
           buffer.write('<table>');
           _writeRow(
-              buffer, [requestCount, 'requests'], classes: ["right", null]);
-          _writeRow(buffer, [averageLatency, 'ms average latency'],
+              buffer,
+              [requestCount, 'requests'],
               classes: ["right", null]);
-          _writeRow(buffer, [maximumLatency, 'ms maximum latency'],
+          _writeRow(
+              buffer,
+              [averageLatency, 'ms average latency'],
               classes: ["right", null]);
-          _writeRow(buffer, [slowRequestPercent, '% > 150 ms latency'],
+          _writeRow(
+              buffer,
+              [maximumLatency, 'ms maximum latency'],
+              classes: ["right", null]);
+          _writeRow(
+              buffer,
+              [slowRequestPercent, '% > 150 ms latency'],
               classes: ["right", null]);
           buffer.write('</table>');
         });
@@ -626,7 +679,10 @@ class GetHandler {
     String value = request.requestedUri.queryParameters['index'];
     int index = value != null ? int.parse(value, onError: (_) => 0) : 0;
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Completion Stats', [],
+      _writePage(
+          buffer,
+          'Analysis Server - Completion Stats',
+          [],
           (StringBuffer buffer) {
         _writeCompletionPerformanceDetail(buffer, index);
         _writeCompletionPerformanceList(buffer);
@@ -646,7 +702,8 @@ class GetHandler {
     String contextFilter = request.uri.queryParameters[CONTEXT_QUERY_PARAM];
     if (contextFilter == null) {
       return _returnFailure(
-          request, 'Query parameter $CONTEXT_QUERY_PARAM required');
+          request,
+          'Query parameter $CONTEXT_QUERY_PARAM required');
     }
     Folder folder = _findFolder(analysisServer, contextFilter);
     if (folder == null) {
@@ -659,11 +716,11 @@ class GetHandler {
     Map<String, String> links = new HashMap<String, String>();
     List<CaughtException> exceptions = <CaughtException>[];
     AnalysisContextImpl context = analysisServer.folderMap[folder];
-    priorityNames = context.prioritySources
-        .map((Source source) => source.fullName)
-        .toList();
-    context.visitCacheItems((Source source, SourceEntry sourceEntry,
-        DataDescriptor rowDesc, CacheState state) {
+    priorityNames =
+        context.prioritySources.map((Source source) => source.fullName).toList();
+    context.visitCacheItems(
+        (Source source, SourceEntry sourceEntry, DataDescriptor rowDesc,
+            CacheState state) {
       String sourceName = source.fullName;
       if (!links.containsKey(sourceName)) {
         CaughtException exception = sourceEntry.exception;
@@ -686,12 +743,12 @@ class GetHandler {
     implicitNames.sort();
 
     _overlayContents.clear();
-    context.visitContentCache((String fullName, int stamp, String contents) {
-      _overlayContents[fullName] = contents;
+    context.visitContentCache((Source source, int stamp, String contents) {
+      _overlayContents[source.fullName] = contents;
     });
 
-    void _writeFiles(
-        StringBuffer buffer, String title, List<String> fileNames) {
+    void _writeFiles(StringBuffer buffer, String title, List<String> fileNames)
+        {
       buffer.write('<h3>$title</h3>');
       if (fileNames == null || fileNames.isEmpty) {
         buffer.write('<p>None</p>');
@@ -702,8 +759,9 @@ class GetHandler {
           buffer.write(links[fileName]);
           buffer.write('</td><td>');
           if (_overlayContents.containsKey(fileName)) {
-            buffer.write(
-                makeLink(OVERLAY_PATH, {PATH_PARAM: fileName}, 'overlay'));
+            buffer.write(makeLink(OVERLAY_PATH, {
+              PATH_PARAM: fileName
+            }, 'overlay'));
           }
           buffer.write('</td></tr>');
         }
@@ -712,9 +770,11 @@ class GetHandler {
     }
 
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Context', [
-        'Context: $contextFilter'
-      ], (StringBuffer buffer) {
+      _writePage(
+          buffer,
+          'Analysis Server - Context',
+          ['Context: $contextFilter'],
+          (StringBuffer buffer) {
         List headerRowText = ['Context'];
         headerRowText.addAll(CacheState.values);
         buffer.write('<h3>Summary</h3>');
@@ -763,7 +823,8 @@ class GetHandler {
     String contextFilter = request.uri.queryParameters[CONTEXT_QUERY_PARAM];
     if (contextFilter == null) {
       return _returnFailure(
-          request, 'Query parameter $CONTEXT_QUERY_PARAM required');
+          request,
+          'Query parameter $CONTEXT_QUERY_PARAM required');
     }
     Folder folder = _findFolder(analysisServer, contextFilter);
     if (folder == null) {
@@ -772,16 +833,18 @@ class GetHandler {
     String sourceUri = request.uri.queryParameters[SOURCE_QUERY_PARAM];
     if (sourceUri == null) {
       return _returnFailure(
-          request, 'Query parameter $SOURCE_QUERY_PARAM required');
+          request,
+          'Query parameter $SOURCE_QUERY_PARAM required');
     }
 
     AnalysisContextImpl context = analysisServer.folderMap[folder];
 
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Element Model', [
-        'Context: $contextFilter',
-        'File: $sourceUri'
-      ], (StringBuffer buffer) {
+      _writePage(
+          buffer,
+          'Analysis Server - Element Model',
+          ['Context: $contextFilter', 'File: $sourceUri'],
+          (StringBuffer buffer) {
         Source source = context.sourceFactory.forUri(sourceUri);
         if (source == null) {
           buffer.write('<p>Not found.</p>');
@@ -804,7 +867,10 @@ class GetHandler {
 
   void _returnFailure(HttpRequest request, String message) {
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Failure', [],
+      _writePage(
+          buffer,
+          'Analysis Server - Failure',
+          [],
           (StringBuffer buffer) {
         buffer.write(HTML_ESCAPE.convert(message));
       });
@@ -827,25 +893,31 @@ class GetHandler {
     String name = request.uri.queryParameters[INDEX_ELEMENT_NAME];
     if (name == null) {
       return _returnFailure(
-          request, 'Query parameter $INDEX_ELEMENT_NAME required');
+          request,
+          'Query parameter $INDEX_ELEMENT_NAME required');
     }
     if (index is LocalIndex) {
       Map<List<String>, List<InspectLocation>> relations =
           await index.findElementsByName(name);
       _writeResponse(request, (StringBuffer buffer) {
-        _writePage(buffer, 'Analysis Server - Index Elements', [
-          'Name: $name'
-        ], (StringBuffer buffer) {
+        _writePage(
+            buffer,
+            'Analysis Server - Index Elements',
+            ['Name: $name'],
+            (StringBuffer buffer) {
           buffer.write('<table border="1">');
-          _writeRow(buffer, ['Element', 'Relationship', 'Location'],
+          _writeRow(
+              buffer,
+              ['Element', 'Relationship', 'Location'],
               header: true);
           relations.forEach(
               (List<String> elementPath, List<InspectLocation> relations) {
             String elementLocation = elementPath.join(' ');
             relations.forEach((InspectLocation location) {
               var relString = location.relationship.identifier;
-              var locString = '${location.path} offset=${location.offset} '
-                  'length=${location.length} flags=${location.flags}';
+              var locString =
+                  '${location.path} offset=${location.offset} '
+                      'length=${location.length} flags=${location.flags}';
               _writeRow(buffer, [elementLocation, relString, locString]);
             });
           });
@@ -865,7 +937,10 @@ class GetHandler {
     String contents = _overlayContents[path];
 
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Overlay', [],
+      _writePage(
+          buffer,
+          'Analysis Server - Overlay',
+          [],
           (StringBuffer buffer) {
         buffer.write('<pre>${HTML_ESCAPE.convert(contents)}</pre>');
       });
@@ -882,18 +957,23 @@ class GetHandler {
     }
 
     _writeResponse(request, (StringBuffer buffer) {
-      _writePage(buffer, 'Analysis Server - Overlays', [],
+      _writePage(
+          buffer,
+          'Analysis Server - Overlays',
+          [],
           (StringBuffer buffer) {
         buffer.write('<table border="1">');
         _overlayContents.clear();
         ContentCache overlayState = analysisServer.overlayState;
-        overlayState.accept((String fullName, int stamp, String contents) {
+        overlayState.accept((Source source, int stamp, String contents) {
+          String fileName = source.fullName;
           buffer.write('<tr>');
-          String link =
-              makeLink(OVERLAY_PATH, {PATH_PARAM: fullName}, fullName);
+          String link = makeLink(OVERLAY_PATH, {
+            PATH_PARAM: fileName
+          }, fileName);
           DateTime time = new DateTime.fromMillisecondsSinceEpoch(stamp);
           _writeRow(buffer, [link, time]);
-          _overlayContents[fullName] = contents;
+          _overlayContents[fileName] = contents;
         });
         int count = _overlayContents.length;
         buffer.write('<tr><td colspan="2">Total: $count entries.</td></tr>');
@@ -930,8 +1010,8 @@ class GetHandler {
         buffer.write(makeLink(COMPLETION_PATH, {}, 'Completion data'));
         buffer.write('</p>');
         buffer.write('<p>');
-        buffer
-            .write(makeLink(COMMUNICATION_PERFORMANCE_PATH, {}, 'Performance'));
+        buffer.write(
+            makeLink(COMMUNICATION_PERFORMANCE_PATH, {}, 'Performance'));
         buffer.write('</p>');
         buffer.write('<p>');
         buffer.write(makeLink(STATUS_PATH, {}, 'Server status'));
@@ -962,8 +1042,8 @@ class GetHandler {
     AnalysisServer analysisServer = _server.analysisServer;
     Map<Folder, AnalysisContext> folderMap = analysisServer.folderMap;
     List<Folder> folders = folderMap.keys.toList();
-    folders.sort((Folder first, Folder second) =>
-        first.shortName.compareTo(second.shortName));
+    folders.sort(
+        (Folder first, Folder second) => first.shortName.compareTo(second.shortName));
     AnalysisOptionsImpl options =
         analysisServer.contextDirectoryManager.defaultOptions;
     ServerOperationQueue operationQueue = analysisServer.operationQueue;
@@ -1005,19 +1085,23 @@ class GetHandler {
       buffer.write('<p><b>Options</b></p>');
       buffer.write('<p>');
       _writeOption(
-          buffer, 'Analyze functon bodies', options.analyzeFunctionBodies);
+          buffer,
+          'Analyze functon bodies',
+          options.analyzeFunctionBodies);
       _writeOption(buffer, 'Cache size', options.cacheSize);
       _writeOption(buffer, 'Generate hints', options.hint);
       _writeOption(buffer, 'Generate dart2js hints', options.dart2jsHint);
-      _writeOption(buffer, 'Generate errors in implicit files',
-          options.generateImplicitErrors);
-      _writeOption(
-          buffer, 'Generate errors in SDK files', options.generateSdkErrors);
+      _writeOption(buffer, 'Generate SDK errors', options.generateSdkErrors);
       _writeOption(buffer, 'Incremental resolution', options.incremental);
-      _writeOption(buffer, 'Incremental resolution with API changes',
+      _writeOption(
+          buffer,
+          'Incremental resolution with API changes',
           options.incrementalApi);
       _writeOption(
-          buffer, 'Preserve comments', options.preserveComments, last: true);
+          buffer,
+          'Preserve comments',
+          options.preserveComments,
+          last: true);
       buffer.write('</p>');
       int freq = AnalysisServer.performOperationDelayFreqency;
       String delay = freq > 0 ? '1 ms every $freq ms' : 'off';
@@ -1029,7 +1113,9 @@ class GetHandler {
       buffer.write('</p>');
     }, (StringBuffer buffer) {
       _writeSubscriptionMap(
-          buffer, AnalysisService.VALUES, analysisServer.analysisServices);
+          buffer,
+          AnalysisService.VALUES,
+          analysisServer.analysisServices);
     });
   }
 
@@ -1082,37 +1168,40 @@ class GetHandler {
       return;
     }
     buffer.write('<table>');
-    _writeRow(buffer, [
-      'Start Time',
-      '',
-      'First (ms)',
-      '',
-      'Complete (ms)',
-      '',
-      '# Notifications',
-      '',
-      '# Suggestions',
-      '',
-      'Snippet'
-    ], header: true);
+    _writeRow(
+        buffer,
+        [
+            'Start Time',
+            '',
+            'First (ms)',
+            '',
+            'Complete (ms)',
+            '',
+            '# Notifications',
+            '',
+            '# Suggestions',
+            '',
+            'Snippet'],
+        header: true);
     int index = 0;
     for (CompletionPerformance performance in handler.performanceList) {
       String link = makeLink(COMPLETION_PATH, {
         'index': '$index'
       }, '${performance.startTimeAndMs}');
-      _writeRow(buffer, [
-        link,
-        '&nbsp;&nbsp;',
-        performance.firstNotificationInMilliseconds,
-        '&nbsp;&nbsp;',
-        performance.elapsedInMilliseconds,
-        '&nbsp;&nbsp;',
-        performance.notificationCount,
-        '&nbsp;&nbsp;',
-        performance.suggestionCount,
-        '&nbsp;&nbsp;',
-        HTML_ESCAPE.convert(performance.snippet)
-      ]);
+      _writeRow(
+          buffer,
+          [
+              link,
+              '&nbsp;&nbsp;',
+              performance.firstNotificationInMilliseconds,
+              '&nbsp;&nbsp;',
+              performance.elapsedInMilliseconds,
+              '&nbsp;&nbsp;',
+              performance.notificationCount,
+              '&nbsp;&nbsp;',
+              performance.suggestionCount,
+              '&nbsp;&nbsp;',
+              HTML_ESCAPE.convert(performance.snippet)]);
       ++index;
     }
 
@@ -1142,8 +1231,8 @@ class GetHandler {
    * the current page and needs to be linked to a separate page.
    */
   void _writeDescriptorTable(StringBuffer buffer,
-      List<DataDescriptor> descriptors, CacheState getState(DataDescriptor),
-      dynamic getValue(DataDescriptor), Map<String, String> linkParameters) {
+      List<DataDescriptor> descriptors, CacheState getState(DataDescriptor), dynamic
+      getValue(DataDescriptor), Map<String, String> linkParameters) {
     buffer.write('<dl>');
     for (DataDescriptor descriptor in descriptors) {
       String descriptorName = HTML_ESCAPE.convert(descriptor.toString());
@@ -1171,7 +1260,8 @@ class GetHandler {
       buffer.write('<p>');
       buffer.write(makeLink(COMPLETION_PATH, {}, 'Completion data'));
       buffer.write('</p>');
-    }, (StringBuffer buffer) {});
+    }, (StringBuffer buffer) {
+    });
   }
 
   /**
@@ -1226,7 +1316,8 @@ class GetHandler {
       buffer.write('<h3>Execution Domain</h3>');
       _writeTwoColumns(buffer, (StringBuffer buffer) {
         _writeSubscriptionList(buffer, ExecutionService.VALUES, services);
-      }, (StringBuffer buffer) {});
+      }, (StringBuffer buffer) {
+      });
     }
   }
 
@@ -1236,8 +1327,8 @@ class GetHandler {
    * options unless the [last] flag is true, indicating that this is the last
    * option in the list of options.
    */
-  void _writeOption(StringBuffer buffer, String name, Object value,
-      {bool last: false}) {
+  void _writeOption(StringBuffer buffer, String name, Object value, {bool last:
+      false}) {
     buffer.write(name);
     buffer.write(' = ');
     buffer.write(value.toString());
@@ -1350,8 +1441,8 @@ class GetHandler {
    * one cell for each of the [columns], and will be a header row if [header] is
    * `true`.
    */
-  void _writeRow(StringBuffer buffer, List<Object> columns,
-      {bool header: false, List<String> classes}) {
+  void _writeRow(StringBuffer buffer, List<Object> columns, {bool header: false,
+      List<String> classes}) {
     buffer.write('<tr>');
     int count = columns.length;
     int maxClassIndex = classes == null ? 0 : classes.length - 1;
@@ -1407,8 +1498,8 @@ class GetHandler {
 
       buffer.write('<p><b>Performance Data</b></p>');
       buffer.write('<p>');
-      buffer.write(makeLink(
-          COMMUNICATION_PERFORMANCE_PATH, {}, 'Communication performance'));
+      buffer.write(
+          makeLink(COMMUNICATION_PERFORMANCE_PATH, {}, 'Communication performance'));
       buffer.write('</p>');
     }, (StringBuffer buffer) {
       _writeSubscriptionList(buffer, ServerService.VALUES, services);
@@ -1436,8 +1527,8 @@ class GetHandler {
    * that are actually subscribed to ([subscribedServices]), write a
    * representation of the service to the given [buffer].
    */
-  void _writeSubscriptionInList(
-      StringBuffer buffer, Enum service, Set<Enum> subscribedServices) {
+  void _writeSubscriptionInList(StringBuffer buffer, Enum service,
+      Set<Enum> subscribedServices) {
     if (subscribedServices.contains(service)) {
       buffer.write('<code>+ </code>');
     } else {
@@ -1452,8 +1543,8 @@ class GetHandler {
    * subscribed to the services ([subscribedPaths]), write a representation of
    * the service to the given [buffer].
    */
-  void _writeSubscriptionInMap(
-      StringBuffer buffer, Enum service, Set<String> subscribedPaths) {
+  void _writeSubscriptionInMap(StringBuffer buffer, Enum service,
+      Set<String> subscribedPaths) {
     buffer.write('<p>');
     buffer.write(service.name);
     buffer.write('</p>');
@@ -1507,8 +1598,8 @@ class GetHandler {
    */
   void _writeTwoColumns(StringBuffer buffer, HtmlGenerator leftColumn,
       HtmlGenerator rightColumn) {
-    buffer
-        .write('<table class="column"><tr class="column"><td class="column">');
+    buffer.write(
+        '<table class="column"><tr class="column"><td class="column">');
     leftColumn(buffer);
     buffer.write('</td><td class="column">');
     rightColumn(buffer);
@@ -1520,8 +1611,8 @@ class GetHandler {
    * [linkParameters] will be used if the value is too large to be displayed on
    * the current page and needs to be linked to a separate page.
    */
-  void _writeValueAsHtml(
-      StringBuffer buffer, Object value, Map<String, String> linkParameters) {
+  void _writeValueAsHtml(StringBuffer buffer, Object value, Map<String,
+      String> linkParameters) {
     if (value == null) {
       buffer.write('<i>null</i>');
     } else if (value is String) {
@@ -1554,9 +1645,8 @@ class GetHandler {
    * [innerHtml]. If [hasError] is `true`, then the link will have the class
    * 'error'.
    */
-  static String makeLink(
-      String path, Map<String, String> params, String innerHtml,
-      [bool hasError = false]) {
+  static String makeLink(String path, Map<String, String> params,
+      String innerHtml, [bool hasError = false]) {
     Uri uri = new Uri(path: path, queryParameters: params);
     String href = HTML_ESCAPE.convert(uri.toString());
     String classAttribute = hasError ? ' class="error"' : '';

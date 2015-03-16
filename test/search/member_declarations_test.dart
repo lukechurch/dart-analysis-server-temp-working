@@ -12,10 +12,12 @@ import 'package:unittest/unittest.dart';
 import '../reflective_tests.dart';
 import 'abstract_search_domain.dart';
 
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(MemberDeclarationsTest);
 }
+
 
 @reflectiveTest
 class MemberDeclarationsTest extends AbstractSearchDomainTest {

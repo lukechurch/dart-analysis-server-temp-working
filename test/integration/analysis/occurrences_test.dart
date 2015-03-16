@@ -31,7 +31,9 @@ main() {
 ''';
     writeFile(pathname, text);
     standardAnalysisSetup();
-    sendAnalysisSetSubscriptions({AnalysisService.OCCURRENCES: [pathname]});
+    sendAnalysisSetSubscriptions({
+      AnalysisService.OCCURRENCES: [pathname]
+    });
     List<Occurrences> occurrences;
     onAnalysisOccurrences.listen((AnalysisOccurrencesParams params) {
       expect(params.file, equals(pathname));
@@ -49,9 +51,8 @@ main() {
         return null;
       }
       void check(String elementName, Iterable<String> expectedOccurrences) {
-        Set<int> expectedOffsets = expectedOccurrences
-            .map((String substring) => text.indexOf(substring))
-            .toSet();
+        Set<int> expectedOffsets =
+            expectedOccurrences.map((String substring) => text.indexOf(substring)).toSet();
         Set<int> foundOffsets = findOffsets(elementName);
         expect(foundOffsets, equals(expectedOffsets));
       }

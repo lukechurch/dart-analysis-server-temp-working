@@ -10,6 +10,7 @@ import 'package:analysis_server/src/protocol_server.dart' as protocol;
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/element.dart';
 
+
 /**
  * A computer for elements occurrences in a Dart [CompilationUnit].
  */
@@ -61,6 +62,7 @@ class DartUnitOccurrencesComputer {
     return element;
   }
 }
+
 
 class _DartUnitOccurrencesComputerVisitor extends RecursiveAstVisitor {
   final DartUnitOccurrencesComputer computer;

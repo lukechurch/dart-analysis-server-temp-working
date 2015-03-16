@@ -39,7 +39,8 @@ main() {
 
     test('registerExtension - non existent', () {
       ExtensionManager manager = new ExtensionManager();
-      expect(() => manager.registerExtension('does not exist', 'extension'),
+      expect(
+          () => manager.registerExtension('does not exist', 'extension'),
           throwsA(new isInstanceOf<ExtensionError>()));
       ;
     });
@@ -49,21 +50,27 @@ main() {
       Plugin plugin2 = new TestPlugin('plugin2');
       ExtensionManager manager = new ExtensionManager();
       expect(
-          manager.registerExtensionPoint(plugin1, 'point1', null), isNotNull);
+          manager.registerExtensionPoint(plugin1, 'point1', null),
+          isNotNull);
       expect(
-          manager.registerExtensionPoint(plugin1, 'point2', null), isNotNull);
+          manager.registerExtensionPoint(plugin1, 'point2', null),
+          isNotNull);
       expect(
-          manager.registerExtensionPoint(plugin2, 'point1', null), isNotNull);
+          manager.registerExtensionPoint(plugin2, 'point1', null),
+          isNotNull);
       expect(
-          manager.registerExtensionPoint(plugin2, 'point2', null), isNotNull);
+          manager.registerExtensionPoint(plugin2, 'point2', null),
+          isNotNull);
     });
 
     test('registerExtensionPoint - conflicting - same plugin', () {
       Plugin plugin1 = new TestPlugin('plugin1');
       ExtensionManager manager = new ExtensionManager();
       expect(
-          manager.registerExtensionPoint(plugin1, 'point1', null), isNotNull);
-      expect(() => manager.registerExtensionPoint(plugin1, 'point1', null),
+          manager.registerExtensionPoint(plugin1, 'point1', null),
+          isNotNull);
+      expect(
+          () => manager.registerExtensionPoint(plugin1, 'point1', null),
           throwsA(new isInstanceOf<ExtensionError>()));
     });
 
@@ -72,8 +79,10 @@ main() {
       Plugin plugin2 = new TestPlugin('plugin1');
       ExtensionManager manager = new ExtensionManager();
       expect(
-          manager.registerExtensionPoint(plugin1, 'point1', null), isNotNull);
-      expect(() => manager.registerExtensionPoint(plugin2, 'point1', null),
+          manager.registerExtensionPoint(plugin1, 'point1', null),
+          isNotNull);
+      expect(
+          () => manager.registerExtensionPoint(plugin2, 'point1', null),
           throwsA(new isInstanceOf<ExtensionError>()));
     });
   });
@@ -117,8 +126,8 @@ main() {
 
     test('add - with validator - valid', () {
       Plugin plugin = new TestPlugin('plugin');
-      ExtensionPointImpl point = new ExtensionPointImpl(plugin, 'point',
-          (Object extension) {
+      ExtensionPointImpl point =
+          new ExtensionPointImpl(plugin, 'point', (Object extension) {
         if (extension is! String) {
           throw new ExtensionError('');
         }
@@ -128,8 +137,8 @@ main() {
 
     test('add - with validator - invalid', () {
       Plugin plugin = new TestPlugin('plugin');
-      ExtensionPointImpl point = new ExtensionPointImpl(plugin, 'point',
-          (Object extension) {
+      ExtensionPointImpl point =
+          new ExtensionPointImpl(plugin, 'point', (Object extension) {
         if (extension is! String) {
           throw new ExtensionError('');
         }

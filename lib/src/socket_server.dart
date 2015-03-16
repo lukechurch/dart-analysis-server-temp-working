@@ -15,6 +15,7 @@ import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
 import 'package:analyzer/src/generated/sdk_io.dart';
 
+
 /**
  * Instances of the class [SocketServer] implement the common parts of
  * http-based and stdio-based analysis servers.  The primary responsibility of
@@ -43,7 +44,8 @@ class SocketServer {
   void createAnalysisServer(ServerCommunicationChannel serverChannel) {
     if (analysisServer != null) {
       RequestError error = new RequestError(
-          RequestErrorCode.SERVER_ALREADY_STARTED, "Server already started");
+          RequestErrorCode.SERVER_ALREADY_STARTED,
+          "Server already started");
       serverChannel.sendResponse(new Response('', error: error));
       serverChannel.listen((Request request) {
         serverChannel.sendResponse(new Response(request.id, error: error));
@@ -55,8 +57,8 @@ class SocketServer {
     if (analysisServerOptions.fileReadMode == 'as-is') {
       resourceProvider = PhysicalResourceProvider.INSTANCE;
     } else if (analysisServerOptions.fileReadMode == 'normalize-eol-always') {
-      resourceProvider = new PhysicalResourceProvider(
-          PhysicalResourceProvider.NORMALIZE_EOL_ALWAYS);
+      resourceProvider =
+          new PhysicalResourceProvider(PhysicalResourceProvider.NORMALIZE_EOL_ALWAYS);
     } else {
       throw new Exception(
           'File read mode was set to the unknown mode: $analysisServerOptions.fileReadMode');
@@ -68,9 +70,14 @@ class SocketServer {
       index.run();
     }
 
-    analysisServer = new AnalysisServer(serverChannel, resourceProvider,
-        new CachingPubPackageMapProvider(resourceProvider, defaultSdk), index,
-        analysisServerOptions, defaultSdk, instrumentationService,
+    analysisServer = new AnalysisServer(
+        serverChannel,
+        resourceProvider,
+        new CachingPubPackageMapProvider(resourceProvider, defaultSdk),
+        index,
+        analysisServerOptions,
+        defaultSdk,
+        instrumentationService,
         rethrowExceptions: false);
     _initializeHandlers(analysisServer);
   }

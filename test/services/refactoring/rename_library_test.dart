@@ -11,10 +11,13 @@ import 'package:unittest/unittest.dart';
 import '../../reflective_tests.dart';
 import 'abstract_rename.dart';
 
+
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(RenameLibraryTest);
 }
+
 
 @reflectiveTest
 class RenameLibraryTest extends RenameRefactoringTest {
@@ -26,17 +29,20 @@ library my.app;
     // null
     refactoring.newName = null;
     assertRefactoringStatus(
-        refactoring.checkNewName(), RefactoringProblemSeverity.FATAL,
+        refactoring.checkNewName(),
+        RefactoringProblemSeverity.FATAL,
         expectedMessage: "Library name must not be null.");
     // empty
     refactoring.newName = '';
     assertRefactoringStatus(
-        refactoring.checkNewName(), RefactoringProblemSeverity.FATAL,
+        refactoring.checkNewName(),
+        RefactoringProblemSeverity.FATAL,
         expectedMessage: "Library name must not be blank.");
     // same name
     refactoring.newName = 'my.app';
     assertRefactoringStatus(
-        refactoring.checkNewName(), RefactoringProblemSeverity.FATAL,
+        refactoring.checkNewName(),
+        RefactoringProblemSeverity.FATAL,
         expectedMessage: "The new name must be different than the current name.");
   }
 
@@ -49,7 +55,8 @@ library my.app;
 part 'part.dart';
 ''');
     index.indexUnit(
-        context, context.resolveCompilationUnit2(unitSource, testSource));
+        context,
+        context.resolveCompilationUnit2(unitSource, testSource));
     // configure refactoring
     _createRenameRefactoring();
     expect(refactoring.refactoringName, 'Rename Library');

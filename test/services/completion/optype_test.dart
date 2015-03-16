@@ -21,6 +21,7 @@ main() {
 
 @reflectiveTest
 class OpTypeTest {
+
   OpType visitor;
 
   void addTestSource(String content, {bool resolved: false}) {
@@ -34,9 +35,9 @@ class OpTypeTest {
     context.sourceFactory =
         new SourceFactory([AbstractContextTest.SDK_RESOLVER]);
     context.setContents(source, content);
-    CompilationUnit unit = resolved
-        ? context.resolveCompilationUnit2(source, source)
-        : context.parseCompilationUnit(source);
+    CompilationUnit unit = resolved ?
+        context.resolveCompilationUnit2(source, source) :
+        context.parseCompilationUnit(source);
     CompletionTarget completionTarget =
         new CompletionTarget.forOffset(unit, offset);
     visitor = new OpType.forCompletion(completionTarget, offset);
@@ -44,21 +45,31 @@ class OpTypeTest {
 
   void assertOpType({bool invocation: false, bool returnValue: false,
       bool typeNames: false, bool voidReturn: false, bool statementLabel: false,
-      bool caseLabel: false, bool constructors: false}) {
-    expect(visitor.includeInvocationSuggestions, equals(invocation),
+      bool caseLabel: false}) {
+    expect(
+        visitor.includeInvocationSuggestions,
+        equals(invocation),
         reason: 'invocation');
-    expect(visitor.includeReturnValueSuggestions, equals(returnValue),
+    expect(
+        visitor.includeReturnValueSuggestions,
+        equals(returnValue),
         reason: 'returnValue');
-    expect(visitor.includeTypeNameSuggestions, equals(typeNames),
+    expect(
+        visitor.includeTypeNameSuggestions,
+        equals(typeNames),
         reason: 'typeNames');
-    expect(visitor.includeVoidReturnSuggestions, equals(voidReturn),
+    expect(
+        visitor.includeVoidReturnSuggestions,
+        equals(voidReturn),
         reason: 'voidReturn');
-    expect(visitor.includeStatementLabelSuggestions, equals(statementLabel),
+    expect(
+        visitor.includeStatementLabelSuggestions,
+        equals(statementLabel),
         reason: 'statementLabel');
-    expect(visitor.includeCaseLabelSuggestions, equals(caseLabel),
+    expect(
+        visitor.includeCaseLabelSuggestions,
+        equals(caseLabel),
         reason: 'caseLabel');
-    expect(visitor.includeConstructorSuggestions, equals(constructors),
-        reason: 'constructors');
   }
 
   test_Annotation() {
@@ -333,7 +344,7 @@ class OpTypeTest {
     // SimpleIdentifier  PrefixedIdentifier  TypeName  ConstructorName
     // InstanceCreationExpression
     addTestSource('main() {new Str^ing.fromCharCodes([]);}', resolved: true);
-    assertOpType(constructors: true);
+    assertOpType(typeNames: true);
   }
 
   test_ConstructorName_resolved() {
@@ -556,16 +567,10 @@ class OpTypeTest {
     assertOpType(returnValue: true, typeNames: true);
   }
 
-  test_InstanceCreationExpression() {
+  test_InstanceCreationExpression_imported() {
     // SimpleIdentifier  TypeName  ConstructorName  InstanceCreationExpression
     addTestSource('class C {foo(){var f; {var x;} new ^}}');
-    assertOpType(constructors: true);
-  }
-
-  test_InstanceCreationExpression_trailingStmt() {
-    // SimpleIdentifier  TypeName  ConstructorName  InstanceCreationExpression
-    addTestSource('class C {foo(){var f; {var x;} new ^ int x = 7;}}');
-    assertOpType(constructors: true);
+    assertOpType(typeNames: true);
   }
 
   test_InstanceCreationExpression_keyword() {
@@ -583,7 +588,7 @@ class OpTypeTest {
   test_InterpolationExpression() {
     // SimpleIdentifier  InterpolationExpression  StringInterpolation
     addTestSource('main() {String name; print("hello \$^");}');
-    assertOpType(returnValue: true);
+    assertOpType(returnValue: true, typeNames: true);
   }
 
   test_InterpolationExpression_block() {
@@ -767,12 +772,6 @@ class OpTypeTest {
     // VariableDeclarationStatement  Block
     addTestSource('main() {var ^}');
     assertOpType();
-  }
-
-  test_VariableDeclarationList_final() {
-    // VariableDeclarationList  VariableDeclarationStatement  Block
-    addTestSource('main() {final ^}');
-    assertOpType(typeNames: true);
   }
 
   test_VariableDeclarationStatement_afterSemicolon() {

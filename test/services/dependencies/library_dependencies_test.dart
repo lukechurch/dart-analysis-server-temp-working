@@ -15,8 +15,10 @@ main() {
   runReflectiveTests(LibraryDependenciesTest);
 }
 
+
 @reflectiveTest
 class LibraryDependenciesTest extends AbstractContextTest {
+
   test_LibraryDependencies() {
     addSource('/lib1.dart', 'import "lib2.dart";');
     addSource('/lib2.dart', 'import "lib1.dart";');

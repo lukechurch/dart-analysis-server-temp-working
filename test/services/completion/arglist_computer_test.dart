@@ -18,6 +18,7 @@ main() {
 
 @reflectiveTest
 class ArgListComputerTest extends AbstractCompletionTest {
+
   @override
   void setUpComputer() {
     computer = new ArgListComputer();

@@ -6,6 +6,7 @@ library services.src.correction.strings;
 
 import 'dart:math';
 
+
 /**
  * "$"
  */
@@ -20,6 +21,7 @@ const int CHAR_DOT = 0x2E;
  * "_"
  */
 const int CHAR_UNDERSCORE = 0x5F;
+
 
 String capitalize(String str) {
   if (isEmpty(str)) {
@@ -161,12 +163,14 @@ bool isWhitespace(int c) {
   return isSpace(c) || c == 0x0D || c == 0x0A;
 }
 
+
 String remove(String str, String remove) {
   if (isEmpty(str) || isEmpty(remove)) {
     return str;
   }
   return str.replaceAll(remove, '');
 }
+
 
 String removeEnd(String str, String remove) {
   if (isEmpty(str) || isEmpty(remove)) {
@@ -178,6 +182,7 @@ String removeEnd(String str, String remove) {
   return str;
 }
 
+
 String removeStart(String str, String remove) {
   if (isEmpty(str) || isEmpty(remove)) {
     return str;
@@ -188,6 +193,7 @@ String removeStart(String str, String remove) {
   return str;
 }
 
+
 String repeat(String s, int n) {
   StringBuffer sb = new StringBuffer();
   for (int i = 0; i < n; i++) {
@@ -195,6 +201,7 @@ String repeat(String s, int n) {
   }
   return sb.toString();
 }
+
 
 /**
  * Gets the substring after the last occurrence of a separator.

@@ -89,8 +89,8 @@ class CompletionDomainHandler implements RequestHandler {
    * Return the [CompletionManager] for the given [context] and [source],
    * creating a new manager or returning an existing manager as necessary.
    */
-  CompletionManager completionManagerFor(
-      AnalysisContext context, Source source) {
+  CompletionManager completionManagerFor(AnalysisContext context,
+      Source source) {
     if (_manager != null) {
       if (_manager.context == context && _manager.source == source) {
         return _manager;
@@ -118,8 +118,8 @@ class CompletionDomainHandler implements RequestHandler {
     }
   }
 
-  CompletionManager createCompletionManager(
-      AnalysisContext context, Source source, SearchEngine searchEngine) {
+  CompletionManager createCompletionManager(AnalysisContext context,
+      Source source, SearchEngine searchEngine) {
     return new CompletionManager.create(context, source, searchEngine);
   }
 
@@ -174,9 +174,8 @@ class CompletionDomainHandler implements RequestHandler {
         new CompletionGetSuggestionsParams.fromRequest(request);
     // schedule completion analysis
     String completionId = (_nextCompletionId++).toString();
-    ContextSourcePair contextSource = server.getContextSourcePair(params.file);
-    AnalysisContext context = contextSource.context;
-    Source source = contextSource.source;
+    AnalysisContext context = server.getAnalysisContext(params.file);
+    Source source = server.getSource(params.file);
     recordRequest(performance, context, source, params.offset);
     if (manager == null) {
       manager = completionManagerFor(context, source);
@@ -187,8 +186,12 @@ class CompletionDomainHandler implements RequestHandler {
     manager.results(completionRequest).listen((CompletionResult result) {
       ++notificationCount;
       performance.logElapseTime("notification $notificationCount send", () {
-        sendCompletionNotification(completionId, result.replacementOffset,
-            result.replacementLength, result.suggestions, result.last);
+        sendCompletionNotification(
+            completionId,
+            result.replacementOffset,
+            result.replacementLength,
+            result.suggestions,
+            result.last);
       });
       if (notificationCount == 1) {
         performance.logFirstNotificationComplete('notification 1 complete');
@@ -201,8 +204,8 @@ class CompletionDomainHandler implements RequestHandler {
       }
     });
     // initial response without results
-    return new CompletionGetSuggestionsResult(completionId)
-        .toResponse(request.id);
+    return new CompletionGetSuggestionsResult(
+        completionId).toResponse(request.id);
   }
 
   /**
@@ -230,11 +233,14 @@ class CompletionDomainHandler implements RequestHandler {
    * Send completion notification results.
    */
   void sendCompletionNotification(String completionId, int replacementOffset,
-      int replacementLength, Iterable<CompletionSuggestion> results,
-      bool isLast) {
-    server.sendNotification(new CompletionResultsParams(
-            completionId, replacementOffset, replacementLength, results, isLast)
-        .toNotification());
+      int replacementLength, Iterable<CompletionSuggestion> results, bool isLast) {
+    server.sendNotification(
+        new CompletionResultsParams(
+            completionId,
+            replacementOffset,
+            replacementLength,
+            results,
+            isLast).toNotification());
   }
 
   /**
@@ -242,6 +248,7 @@ class CompletionDomainHandler implements RequestHandler {
    * the cache changes or if any source is added, removed, or deleted.
    */
   void sourcesChanged(SourcesChangedEvent event) {
+
     bool shouldDiscardManager(SourcesChangedEvent event) {
       if (_manager == null) {
         return false;
@@ -251,8 +258,7 @@ class CompletionDomainHandler implements RequestHandler {
       }
       var changedSources = event.changedSources;
       return changedSources.length > 2 ||
-          (changedSources.length == 1 &&
-              !changedSources.contains(_manager.source));
+          (changedSources.length == 1 && !changedSources.contains(_manager.source));
     }
 
     if (shouldDiscardManager(event)) {

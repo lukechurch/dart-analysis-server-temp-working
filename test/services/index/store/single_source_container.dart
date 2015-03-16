@@ -6,6 +6,7 @@ library test.services.src.index.store.single_source_container;
 
 import 'package:analyzer/src/generated/source.dart';
 
+
 /**
  * A [SourceContainer] with a single [Source].
  */

@@ -14,7 +14,6 @@ import 'package:analysis_server/src/protocol.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
-import 'package:analyzer/source/package_map_resolver.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/java_engine.dart';
 import 'package:analyzer/src/generated/source.dart';
@@ -35,7 +34,6 @@ class AnalysisServerTest {
   MockServerChannel channel;
   AnalysisServer server;
   MemoryResourceProvider resourceProvider;
-  MockPackageMapProvider packageMapProvider;
 
   /**
    * Verify that getAnalysisContextForSource returns the correct contexts even
@@ -114,10 +112,15 @@ import "../foo/foo.dart";
   void setUp() {
     channel = new MockServerChannel();
     resourceProvider = new MemoryResourceProvider();
-    packageMapProvider = new MockPackageMapProvider();
-    server = new AnalysisServer(channel, resourceProvider, packageMapProvider,
-        null, new AnalysisServerOptions(), new MockSdk(),
-        InstrumentationService.NULL_SERVICE, rethrowExceptions: true);
+    server = new AnalysisServer(
+        channel,
+        resourceProvider,
+        new MockPackageMapProvider(),
+        null,
+        new AnalysisServerOptions(),
+        new MockSdk(),
+        InstrumentationService.NULL_SERVICE,
+        rethrowExceptions: true);
   }
 
   Future test_contextDisposed() {
@@ -131,6 +134,34 @@ import "../foo/foo.dart";
     }).then((_) => pumpEventQueue()).then((_) {
       expect(context.isDisposed, isTrue);
     });
+  }
+
+  test_getAnalysisContext_nested() {
+    String dir1Path = '/dir1';
+    String dir2Path = dir1Path + '/dir2';
+    String filePath = dir2Path + '/file.dart';
+    Folder dir1 = resourceProvider.newFolder(dir1Path);
+    Folder dir2 = resourceProvider.newFolder(dir2Path);
+    resourceProvider.newFile(filePath, 'library lib;');
+
+    AnalysisContext context1 = AnalysisEngine.instance.createAnalysisContext();
+    AnalysisContext context2 = AnalysisEngine.instance.createAnalysisContext();
+    server.folderMap[dir1] = context1;
+    server.folderMap[dir2] = context2;
+
+    expect(server.getAnalysisContext(filePath), context2);
+  }
+
+  test_getAnalysisContext_simple() {
+    String dirPath = '/dir';
+    String filePath = dirPath + '/file.dart';
+    Folder dir = resourceProvider.newFolder(dirPath);
+    resourceProvider.newFile(filePath, 'library lib;');
+
+    AnalysisContext context = AnalysisEngine.instance.createAnalysisContext();
+    server.folderMap[dir] = context;
+
+    expect(server.getAnalysisContext(filePath), context);
   }
 
   Future test_contextsChangedEvent() {
@@ -163,7 +194,9 @@ import "../foo/foo.dart";
       wasAdded = false;
       wasChanged = false;
       wasRemoved = false;
-      server.setAnalysisRoots('0', ['/foo'], [], {'/foo': '/bar'});
+      server.setAnalysisRoots('0', ['/foo'], [], {
+        '/foo': '/bar'
+      });
       return pumpEventQueue();
     }).then((_) {
       expect(wasAdded, isFalse);
@@ -220,69 +253,6 @@ import "../foo/foo.dart";
     });
   }
 
-  test_getContextSourcePair_nested() {
-    String dir1Path = '/dir1';
-    String dir2Path = dir1Path + '/dir2';
-    String filePath = dir2Path + '/file.dart';
-    Folder dir1 = resourceProvider.newFolder(dir1Path);
-    Folder dir2 = resourceProvider.newFolder(dir2Path);
-    resourceProvider.newFile(filePath, 'library lib;');
-
-    AnalysisContext context1 = AnalysisEngine.instance.createAnalysisContext();
-    AnalysisContext context2 = AnalysisEngine.instance.createAnalysisContext();
-    _configureSourceFactory(context1);
-    _configureSourceFactory(context2);
-    server.folderMap[dir1] = context1;
-    server.folderMap[dir2] = context2;
-
-    ContextSourcePair pair = server.getContextSourcePair(filePath);
-    Source source = pair.source;
-    expect(pair.context, same(context2));
-    expect(source, isNotNull);
-    expect(source.uri.scheme, 'file');
-    expect(source.fullName, filePath);
-  }
-
-  test_getContextSourcePair_package_inRoot() {
-    String rootPath = '/my_package';
-    String filePath = rootPath + '/lib/file.dart';
-    Folder rootFolder = resourceProvider.newFolder(rootPath);
-    resourceProvider.newFile(filePath, 'library lib;');
-
-    packageMapProvider.packageMap = <String, List<Folder>>{
-      'my_package': <Folder>[rootFolder]
-    };
-
-    AnalysisContext context = AnalysisEngine.instance.createAnalysisContext();
-    _configureSourceFactory(context);
-    server.folderMap[rootFolder] = context;
-
-    ContextSourcePair pair = server.getContextSourcePair(filePath);
-    Source source = pair.source;
-    expect(pair.context, same(context));
-    expect(source, isNotNull);
-    expect(source.uri.scheme, 'package');
-    expect(source.fullName, filePath);
-  }
-
-  test_getContextSourcePair_simple() {
-    String dirPath = '/dir';
-    String filePath = dirPath + '/file.dart';
-    Folder dir = resourceProvider.newFolder(dirPath);
-    resourceProvider.newFile(filePath, 'library lib;');
-
-    AnalysisContext context = AnalysisEngine.instance.createAnalysisContext();
-    _configureSourceFactory(context);
-    server.folderMap[dir] = context;
-
-    ContextSourcePair pair = server.getContextSourcePair(filePath);
-    Source source = pair.source;
-    expect(pair.context, same(context));
-    expect(source, isNotNull);
-    expect(source.uri.scheme, 'file');
-    expect(source.fullName, filePath);
-  }
-
   /**
    * Test that having multiple analysis contexts analyze the same file doesn't
    * cause that file to receive duplicate notifications when it's modified.
@@ -295,8 +265,8 @@ import "../foo/foo.dart";
     resourceProvider.newFile('/foo/foo.dart', 'import "../bar/bar.dart";');
     File bar = resourceProvider.newFile('/bar/bar.dart', 'library bar;');
     server.setAnalysisRoots('0', ['/foo', '/bar'], [], {});
-    Map<AnalysisService, Set<String>> subscriptions =
-        <AnalysisService, Set<String>>{};
+    Map<AnalysisService, Set<String>> subscriptions = <AnalysisService,
+        Set<String>>{};
     for (AnalysisService service in AnalysisService.VALUES) {
       subscriptions[service] = <String>[bar.path].toSet();
     }
@@ -304,8 +274,9 @@ import "../foo/foo.dart";
     await pumpEventQueue(100);
     expect(server.statusAnalyzing, isFalse);
     channel.notificationsReceived.clear();
-    server.updateContent(
-        '0', {bar.path: new AddContentOverlay('library bar; void f() {}')});
+    server.updateContent('0', {
+      bar.path: new AddContentOverlay('library bar; void f() {}')
+    });
     await pumpEventQueue(100);
     expect(server.statusAnalyzing, isFalse);
     expect(channel.notificationsReceived, isNotEmpty);
@@ -328,25 +299,6 @@ import "../foo/foo.dart";
           break;
       }
     }
-  }
-
-  test_operationsRemovedOnContextDisposal() async {
-    resourceProvider.newFolder('/foo');
-    resourceProvider.newFile('/foo/baz.dart', 'library lib;');
-    resourceProvider.newFolder('/bar');
-    resourceProvider.newFile('/bar/baz.dart', 'library lib;');
-    server.setAnalysisRoots('0', ['/foo', '/bar'], [], {});
-    await pumpEventQueue();
-    AnalysisContext contextFoo = server.getAnalysisContext('/foo/baz.dart');
-    AnalysisContext contextBar = server.getAnalysisContext('/bar/baz.dart');
-    _MockServerOperation operationFoo = new _MockServerOperation(contextFoo);
-    _MockServerOperation operationBar = new _MockServerOperation(contextBar);
-    server.scheduleOperation(operationFoo);
-    server.scheduleOperation(operationBar);
-    server.setAnalysisRoots('1', ['/foo'], [], {});
-    await pumpEventQueue();
-    expect(operationFoo.isComplete, isTrue);
-    expect(operationBar.isComplete, isFalse);
   }
 
   Future test_prioritySourcesChangedEvent() {
@@ -385,8 +337,8 @@ import "../foo/foo.dart";
 
   void test_rethrowExceptions() {
     Exception exceptionToThrow = new Exception('test exception');
-    MockServerOperation operation = new MockServerOperation(
-        ServerOperationPriority.ANALYSIS, (_) {
+    MockServerOperation operation =
+        new MockServerOperation(ServerOperationPriority.ANALYSIS, (_) {
       throw exceptionToThrow;
     });
     server.operationQueue.add(operation);
@@ -409,8 +361,9 @@ import "../foo/foo.dart";
     AnalysisResult firstResult = new AnalysisResult([notice], 0, '', 0);
     AnalysisResult lastResult = new AnalysisResult(null, 1, '', 1);
     when(context.analysisOptions).thenReturn(new AnalysisOptionsImpl());
-    when(context.performAnalysisTask)
-        .thenReturnList([firstResult, firstResult, firstResult, lastResult]);
+    when(
+        context.performAnalysisTask).thenReturnList(
+            [firstResult, firstResult, firstResult, lastResult]);
     server.serverServices.add(ServerService.STATUS);
     server.schedulePerformAnalysisOperation(context);
     // Pump the event queue to make sure the server has finished any
@@ -450,41 +403,16 @@ import "../foo/foo.dart";
       expect(response.error, isNotNull);
     });
   }
-
-  void _configureSourceFactory(AnalysisContext context) {
-    var resourceUriResolver = new ResourceUriResolver(resourceProvider);
-    var packageUriResolver = new PackageMapUriResolver(
-        resourceProvider, packageMapProvider.packageMap);
-    context.sourceFactory =
-        new SourceFactory([packageUriResolver, resourceUriResolver]);
-  }
 }
 
 class EchoHandler implements RequestHandler {
   @override
   Response handleRequest(Request request) {
     if (request.method == 'echo') {
-      return new Response(request.id, result: {'echo': true});
+      return new Response(request.id, result: {
+        'echo': true
+      });
     }
     return null;
-  }
-}
-
-/**
- * A [ServerOperation] that does nothing but keep track of whether or not it
- * has been performed.
- */
-class _MockServerOperation implements ServerOperation {
-  final AnalysisContext context;
-  bool isComplete = false;
-
-  _MockServerOperation(this.context);
-
-  @override
-  ServerOperationPriority get priority => ServerOperationPriority.ANALYSIS;
-
-  @override
-  void perform(AnalysisServer server) {
-    isComplete = true;
   }
 }

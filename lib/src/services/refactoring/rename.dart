@@ -16,6 +16,7 @@ import 'package:analyzer/src/generated/element.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
 
+
 /**
  * Returns `true` if two given [Element]s are [LocalElement]s and have
  * intersecting with visibility ranges.
@@ -35,11 +36,12 @@ bool haveIntersectingRanges(LocalElement localElement, Element element) {
       localRange2.intersects(localRange);
 }
 
+
 /**
  * Checks if [element] is defined in the library containing [source].
  */
-bool isDefinedInLibrary(
-    Element element, AnalysisContext context, Source source) {
+bool isDefinedInLibrary(Element element, AnalysisContext context, Source source)
+    {
   // should be the same AnalysisContext
   if (!isInContext(element, context)) {
     return false;
@@ -50,12 +52,14 @@ bool isDefinedInLibrary(
   return librarySourcesOfSource.contains(librarySourceOfElement);
 }
 
+
 /**
  * Checks if the given [Element] is in the given [AnalysisContext].
  */
 bool isInContext(Element element, AnalysisContext context) {
   return element.context == context;
 }
+
 
 /**
  * Checks if the given unqualified [SearchMatch] intersects with visibility
@@ -73,11 +77,12 @@ bool isReferenceInLocalRange(LocalElement localElement, SearchMatch reference) {
       referenceRange.intersects(localRange);
 }
 
+
 /**
  * Checks if [element] is visible in the library containing [source].
  */
-bool isVisibleInLibrary(
-    Element element, AnalysisContext context, Source source) {
+bool isVisibleInLibrary(Element element, AnalysisContext context, Source source)
+    {
   // should be the same AnalysisContext
   if (!isInContext(element, context)) {
     return false;
@@ -90,11 +95,13 @@ bool isVisibleInLibrary(
   return isDefinedInLibrary(element, context, source);
 }
 
+
+
 /**
  * An abstract implementation of [RenameRefactoring].
  */
-abstract class RenameRefactoringImpl extends RefactoringImpl
-    implements RenameRefactoring {
+abstract class RenameRefactoringImpl extends RefactoringImpl implements
+    RenameRefactoring {
   final SearchEngine searchEngine;
   final Element element;
   final AnalysisContext context;

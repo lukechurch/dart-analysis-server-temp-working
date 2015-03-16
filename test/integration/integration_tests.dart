@@ -23,12 +23,18 @@ const Matcher isInt = const isInstanceOf<int>('int');
 
 const Matcher isNotification = const MatchesJsonObject('notification', const {
   'event': isString
-}, optionalFields: const {'params': isMap});
+}, optionalFields: const {
+  'params': isMap
+});
 
 const Matcher isObject = isMap;
 
-final Matcher isResponse = new MatchesJsonObject('response', {'id': isString},
-    optionalFields: {'result': anything, 'error': isRequestError});
+final Matcher isResponse = new MatchesJsonObject('response', {
+  'id': isString
+}, optionalFields: {
+  'result': anything,
+  'error': isRequestError
+});
 
 const Matcher isString = const isInstanceOf<String>('String');
 
@@ -57,8 +63,8 @@ typedef void NotificationProcessor(String event, params);
 /**
  * Base class for analysis server integration tests.
  */
-abstract class AbstractAnalysisServerIntegrationTest
-    extends IntegrationTestMixin {
+abstract class AbstractAnalysisServerIntegrationTest extends
+    IntegrationTestMixin {
   /**
    * Amount of time to give the server to respond to a shutdown request before
    * forcibly terminating it.
@@ -256,11 +262,14 @@ class LazyMatcher implements Matcher {
   }
 
   @override
-  Description describeMismatch(
-      item, Description mismatchDescription, Map matchState, bool verbose) {
+  Description describeMismatch(item, Description mismatchDescription,
+      Map matchState, bool verbose) {
     _createMatcher();
     return _wrappedMatcher.describeMismatch(
-        item, mismatchDescription, matchState, verbose);
+        item,
+        mismatchDescription,
+        matchState,
+        verbose);
   }
 
   @override
@@ -344,12 +353,10 @@ class MatchesJsonObject extends _RecursiveMatcher {
       requiredFields.forEach((String key, Matcher valueMatcher) {
         if (!item.containsKey(key)) {
           mismatches.add(
-              (Description mismatchDescription) => mismatchDescription
-                  .add('is missing field ')
-                  .addDescriptionOf(key)
-                  .add(' (')
-                  .addDescriptionOf(valueMatcher)
-                  .add(')'));
+              (Description mismatchDescription) =>
+                  mismatchDescription.add(
+                      'is missing field ').addDescriptionOf(
+                          key).add(' (').addDescriptionOf(valueMatcher).add(')'));
         } else {
           _checkField(key, item[key], valueMatcher, mismatches);
         }
@@ -361,9 +368,9 @@ class MatchesJsonObject extends _RecursiveMatcher {
       } else if (optionalFields != null && optionalFields.containsKey(key)) {
         _checkField(key, value, optionalFields[key], mismatches);
       } else {
-        mismatches.add((Description mismatchDescription) => mismatchDescription
-            .add('has unexpected field ')
-            .addDescriptionOf(key));
+        mismatches.add(
+            (Description mismatchDescription) =>
+                mismatchDescription.add('has unexpected field ').addDescriptionOf(key));
       }
     });
   }
@@ -375,9 +382,11 @@ class MatchesJsonObject extends _RecursiveMatcher {
    */
   void _checkField(String key, value, Matcher valueMatcher,
       List<MismatchDescriber> mismatches) {
-    checkSubstructure(value, valueMatcher, mismatches,
-        (Description description) =>
-            description.add('field ').addDescriptionOf(key));
+    checkSubstructure(
+        value,
+        valueMatcher,
+        mismatches,
+        (Description description) => description.add('field ').addDescriptionOf(key));
   }
 }
 
@@ -484,10 +493,8 @@ class Server {
    * [notificationProcessor].
    */
   void listenToOutput(NotificationProcessor notificationProcessor) {
-    _process.stdout
-        .transform((new Utf8Codec()).decoder)
-        .transform(new LineSplitter())
-        .listen((String line) {
+    _process.stdout.transform(
+        (new Utf8Codec()).decoder).transform(new LineSplitter()).listen((String line) {
       String trimmedLine = line.trim();
       _recordStdio('RECV: $trimmedLine');
       var message;
@@ -510,8 +517,9 @@ class Server {
         }
         if (messageAsMap.containsKey('error')) {
           // TODO(paulberry): propagate the error info to the completer.
-          completer.completeError(new UnimplementedError(
-              'Server responded with an error: ${JSON.encode(message)}'));
+          completer.completeError(
+              new UnimplementedError(
+                  'Server responded with an error: ${JSON.encode(message)}'));
         } else {
           completer.complete(messageAsMap['result']);
         }
@@ -531,10 +539,8 @@ class Server {
         expect(message, isNotification);
       }
     });
-    _process.stderr
-        .transform((new Utf8Codec()).decoder)
-        .transform(new LineSplitter())
-        .listen((String line) {
+    _process.stderr.transform(
+        (new Utf8Codec()).decoder).transform(new LineSplitter()).listen((String line) {
       String trimmedLine = line.trim();
       _recordStdio('ERR:  $trimmedLine');
       _badDataFromServer();
@@ -663,14 +669,20 @@ class _ListOf extends Matcher {
       description.add('List of ').addDescriptionOf(elementMatcher);
 
   @override
-  Description describeMismatch(
-      item, Description mismatchDescription, Map matchState, bool verbose) {
+  Description describeMismatch(item, Description mismatchDescription,
+      Map matchState, bool verbose) {
     if (item is! List) {
       return super.describeMismatch(
-          item, mismatchDescription, matchState, verbose);
+          item,
+          mismatchDescription,
+          matchState,
+          verbose);
     } else {
       return iterableMatcher.describeMismatch(
-          item, mismatchDescription, matchState, verbose);
+          item,
+          mismatchDescription,
+          matchState,
+          verbose);
     }
   }
 
@@ -701,11 +713,10 @@ class _MapOf extends _RecursiveMatcher {
   _MapOf(this.keyMatcher, this.valueMatcher);
 
   @override
-  Description describe(Description description) => description
-      .add('Map from ')
-      .addDescriptionOf(keyMatcher)
-      .add(' to ')
-      .addDescriptionOf(valueMatcher);
+  Description describe(Description description) =>
+      description.add(
+          'Map from ').addDescriptionOf(
+              keyMatcher).add(' to ').addDescriptionOf(valueMatcher);
 
   @override
   void populateMismatches(item, List<MismatchDescriber> mismatches) {
@@ -714,12 +725,16 @@ class _MapOf extends _RecursiveMatcher {
       return;
     }
     item.forEach((key, value) {
-      checkSubstructure(key, keyMatcher, mismatches,
-          (Description description) =>
-              description.add('key ').addDescriptionOf(key));
-      checkSubstructure(value, valueMatcher, mismatches,
-          (Description description) =>
-              description.add('field ').addDescriptionOf(key));
+      checkSubstructure(
+          key,
+          keyMatcher,
+          mismatches,
+          (Description description) => description.add('key ').addDescriptionOf(key));
+      checkSubstructure(
+          value,
+          valueMatcher,
+          mismatches,
+          (Description description) => description.add('field ').addDescriptionOf(key));
     });
   }
 }
@@ -788,9 +803,11 @@ abstract class _RecursiveMatcher extends Matcher {
         mismatchDescription = describeSubstructure(mismatchDescription);
         mismatchDescription =
             mismatchDescription.add(' (should be ').addDescriptionOf(matcher);
-        String subDescription = matcher
-            .describeMismatch(item, new StringDescription(), subState, false)
-            .toString();
+        String subDescription = matcher.describeMismatch(
+            item,
+            new StringDescription(),
+            subState,
+            false).toString();
         if (subDescription.isNotEmpty) {
           mismatchDescription =
               mismatchDescription.add('; ').add(subDescription);
@@ -801,8 +818,8 @@ abstract class _RecursiveMatcher extends Matcher {
   }
 
   @override
-  Description describeMismatch(
-      item, Description mismatchDescription, Map matchState, bool verbose) {
+  Description describeMismatch(item, Description mismatchDescription,
+      Map matchState, bool verbose) {
     List<MismatchDescriber> mismatches = matchState['mismatches'];
     if (mismatches != null) {
       for (int i = 0; i < mismatches.length; i++) {
@@ -821,7 +838,10 @@ abstract class _RecursiveMatcher extends Matcher {
       return mismatchDescription;
     } else {
       return super.describeMismatch(
-          item, mismatchDescription, matchState, verbose);
+          item,
+          mismatchDescription,
+          matchState,
+          verbose);
     }
   }
 
@@ -832,7 +852,9 @@ abstract class _RecursiveMatcher extends Matcher {
     if (mismatches.isEmpty) {
       return true;
     } else {
-      addStateInfo(matchState, {'mismatches': mismatches});
+      addStateInfo(matchState, {
+        'mismatches': mismatches
+      });
       return false;
     }
   }

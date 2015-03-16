@@ -14,6 +14,7 @@ import 'package:analysis_server/src/services/search/search_engine.dart';
 import 'package:analyzer/src/generated/element.dart';
 import 'package:analyzer/src/generated/source.dart';
 
+
 /**
  * When a [Source] (a file) is used in more than one context, [SearchEngine]
  * will return separate [SearchMatch]s for each context. But in rename
@@ -25,8 +26,8 @@ List<SourceReference> getSourceReferences(List<SearchMatch> matches) {
     Element element = match.element;
     String file = element.source.fullName;
     SourceRange range = match.sourceRange;
-    SourceReference newReference = new SourceReference(
-        file, range, element, match.isResolved, match.isQualified);
+    SourceReference newReference =
+        new SourceReference(file, range, element, match.isResolved, match.isQualified);
     SourceReference oldReference = uniqueReferences[newReference];
     if (oldReference == null) {
       uniqueReferences[newReference] = newReference;
@@ -35,6 +36,7 @@ List<SourceReference> getSourceReferences(List<SearchMatch> matches) {
   }
   return uniqueReferences.keys.toList();
 }
+
 
 /**
  * Abstract implementation of [Refactoring].
@@ -54,6 +56,7 @@ abstract class RefactoringImpl implements Refactoring {
   }
 }
 
+
 /**
  * The [SourceRange] in some [Source].
  */
@@ -64,8 +67,8 @@ class SourceReference {
   final bool isResolved;
   final bool isQualified;
 
-  SourceReference(
-      this.file, this.range, this.element, this.isResolved, this.isQualified);
+  SourceReference(this.file, this.range, this.element, this.isResolved,
+      this.isQualified);
 
   @override
   int get hashCode {
