@@ -6,8 +6,7 @@ homepage: http://www.dartlang.org
 environment:
   sdk: '>=1.0.0 <2.0.0'
 dependencies:
-  analyzer:
-    git: git://github.com/lukechurch/dart-analyzer-temp-working.git
+  analyzer:  ^0.24.0
   args: '>=0.12.1 <0.13.0'
   logging: any
   path: any
