@@ -4,7 +4,6 @@
 
 library test.services.completion.invocation;
 
-
 import 'dart:async';
 
 import 'package:analysis_server/src/protocol.dart';
@@ -22,15 +21,11 @@ main() {
 
 @reflectiveTest
 class InvocationComputerTest extends AbstractSelectorSuggestionTest {
-
   @override
   CompletionSuggestion assertSuggestInvocationField(String name, String type,
       {int relevance: DART_RELEVANCE_DEFAULT, bool isDeprecated: false}) {
-    return assertSuggestField(
-        name,
-        type,
-        relevance: relevance,
-        isDeprecated: isDeprecated);
+    return assertSuggestField(name, type,
+        relevance: relevance, isDeprecated: isDeprecated);
   }
 
   /**
@@ -39,8 +34,8 @@ class InvocationComputerTest extends AbstractSelectorSuggestionTest {
    * purposes of what is shown during completion.  [shouldBeShadowed] indicates
    * whether shadowing is expected.
    */
-  Future check_shadowing(String shadower, String shadowee,
-      bool shouldBeShadowed) {
+  Future check_shadowing(
+      String shadower, String shadowee, bool shouldBeShadowed) {
     addTestSource('''
 class Base {
   $shadowee
@@ -53,8 +48,9 @@ void f(Derived d) {
 }
 ''');
     return computeFull((bool result) {
-      List<CompletionSuggestion> suggestionsForX = request.suggestions.where(
-          (CompletionSuggestion s) => s.completion == 'x').toList();
+      List<CompletionSuggestion> suggestionsForX = request.suggestions
+          .where((CompletionSuggestion s) => s.completion == 'x')
+          .toList();
       if (shouldBeShadowed) {
         expect(suggestionsForX, hasLength(1));
         expect(suggestionsForX[0].declaringType, 'Derived');
@@ -138,6 +134,22 @@ void f(C<int> c) {
       // the suggestion object.
       CompletionSuggestion suggestion = assertSuggestSetter('t');
       expect(suggestion.element.parameters, '(int value)');
+    });
+  }
+
+  test_libraryPrefix() {
+    // SimpleIdentifier  PrefixedIdentifier  ExpressionStatement
+    addTestSource('import "dart:async" as bar; foo() {bar.^}');
+    return computeFull((bool result) {
+      assertSuggestClass('Future');
+    });
+  }
+
+  test_libraryPrefix2() {
+    // SimpleIdentifier  MethodInvocation  ExpressionStatement
+    addTestSource('import "dart:async" as bar; foo() {bar.^ print("f")}');
+    return computeFull((bool result) {
+      assertSuggestClass('Future');
     });
   }
 
@@ -403,7 +415,7 @@ void main() {C.^ print("something");}''');
       check_shadowing('int x;', 'set x(int value) {}', true);
 
   test_shadowing_getter_over_field() =>
-      check_shadowing('int get x => null;', 'int x;', false);
+      check_shadowing('int get x => null;', 'int x;', true);
 
   test_shadowing_getter_over_getter() =>
       check_shadowing('int get x => null;', 'int get x => null;', true);
@@ -412,7 +424,7 @@ void main() {C.^ print("something");}''');
       check_shadowing('int get x => null;', 'void x() {}', true);
 
   test_shadowing_getter_over_setter() =>
-      check_shadowing('int get x => null;', 'set x(int value) {}', false);
+      check_shadowing('int get x => null;', 'set x(int value) {}', true);
 
   test_shadowing_method_over_field() =>
       check_shadowing('void x() {}', 'int x;', true);
@@ -472,10 +484,10 @@ void test(Derived d) {
   }
 
   test_shadowing_setter_over_field() =>
-      check_shadowing('set x(int value) {}', 'int x;', false);
+      check_shadowing('set x(int value) {}', 'int x;', true);
 
   test_shadowing_setter_over_getter() =>
-      check_shadowing('set x(int value) {}', 'int get x => null;', false);
+      check_shadowing('set x(int value) {}', 'int get x => null;', true);
 
   test_shadowing_setter_over_method() =>
       check_shadowing('set x(int value) {}', 'void x() {}', true);

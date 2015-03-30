@@ -17,18 +17,16 @@ import '../../abstract_context.dart';
 import '../../reflective_tests.dart';
 import 'abstract_refactoring.dart';
 
-
 main() {
   groupSep = ' | ';
   runReflectiveTests(MoveFileTest);
 }
 
-
 @reflectiveTest
 class MoveFileTest extends RefactoringTest {
   MoveFileRefactoring refactoring;
 
-  test_definingUnit() async {
+  test_file_definingUnit() async {
     String pathA = '/project/000/1111/a.dart';
     String pathB = '/project/000/1111/b.dart';
     String pathC = '/project/000/1111/22/c.dart';
@@ -64,7 +62,7 @@ part '/absolute/uri.dart';
 ''');
   }
 
-  test_importedLibrary() async {
+  test_file_importedLibrary() async {
     String pathA = '/project/000/1111/a.dart';
     testFile = '/project/000/1111/sub/folder/test.dart';
     addSource(pathA, '''
@@ -81,7 +79,7 @@ import '../new/folder/name/new_name.dart';
     assertNoFileChange(testFile);
   }
 
-  test_importedLibrary_down() async {
+  test_file_importedLibrary_down() async {
     String pathA = '/project/000/1111/a.dart';
     testFile = '/project/000/1111/test.dart';
     addSource(pathA, '''
@@ -98,18 +96,18 @@ import '22/new_name.dart';
     assertNoFileChange(testFile);
   }
 
-  test_importedLibrary_package() async {
+  test_file_importedLibrary_package() async {
     // configure packages
     testFile = '/packages/my_pkg/aaa/test.dart';
     provider.newFile(testFile, '');
     Map<String, List<Folder>> packageMap = {
       'my_pkg': [provider.getResource('/packages/my_pkg')]
     };
-    context.sourceFactory = new SourceFactory(
-        [
-            AbstractContextTest.SDK_RESOLVER,
-            resourceResolver,
-            new PackageMapUriResolver(provider, packageMap)]);
+    context.sourceFactory = new SourceFactory([
+      AbstractContextTest.SDK_RESOLVER,
+      resourceResolver,
+      new PackageMapUriResolver(provider, packageMap)
+    ]);
     // do testing
     String pathA = '/project/bin/a.dart';
     addSource(pathA, '''
@@ -126,7 +124,7 @@ import 'package:my_pkg/bbb/ccc/new_name.dart';
     assertNoFileChange(testFile);
   }
 
-  test_importedLibrary_up() async {
+  test_file_importedLibrary_up() async {
     String pathA = '/project/000/1111/a.dart';
     testFile = '/project/000/1111/22/test.dart';
     addSource(pathA, '''
@@ -143,7 +141,7 @@ import 'new_name.dart';
     assertNoFileChange(testFile);
   }
 
-  test_sourcedUnit() async {
+  test_file_sourcedUnit() async {
     String pathA = '/project/000/1111/a.dart';
     testFile = '/project/000/1111/22/test.dart';
     addSource(pathA, '''
@@ -160,7 +158,7 @@ part '22/new_name.dart';
     assertNoFileChange(testFile);
   }
 
-  test_sourcedUnit_multipleLibraries() async {
+  test_file_sourcedUnit_multipleLibraries() async {
     String pathA = '/project/000/1111/a.dart';
     String pathB = '/project/000/b.dart';
     testFile = '/project/000/1111/22/test.dart';
@@ -184,6 +182,45 @@ part '1111/22/new_name.dart';
     assertNoFileChange(testFile);
   }
 
+  test_project() async {
+    String pubspecPath = '/testName/pubspec.yaml';
+    String appPath = '/testName/bin/myApp.dart';
+    provider.newFile(pubspecPath, '''
+name: testName
+version: 0.0.1
+description: My pubspec file.
+''');
+    addSource('/testName/lib/myLib.dart', '');
+    addSource(appPath, '''
+import 'package:testName/myLib.dart';
+export 'package:testName/myLib.dart';
+''');
+    // configure Uri resolves
+    context.sourceFactory = new SourceFactory([
+      AbstractContextTest.SDK_RESOLVER,
+      new PackageMapUriResolver(provider, <String, List<Folder>>{
+        'testName': [provider.getResource('/testName/lib')]
+      }),
+      resourceResolver,
+    ]);
+    // analyze
+    _performAnalysis();
+    // perform refactoring
+    refactoring = new MoveFileRefactoring(
+        provider, searchEngine, context, null, '/testName');
+    refactoring.newFile = '/newName';
+    await _assertSuccessfulRefactoring();
+    assertFileChangeResult(pubspecPath, '''
+name: newName
+version: 0.0.1
+description: My pubspec file.
+''');
+    assertFileChangeResult(appPath, '''
+import 'package:newName/myLib.dart';
+export 'package:newName/myLib.dart';
+''');
+  }
+
   /**
    * Checks that all conditions are OK.
    */
@@ -194,10 +231,7 @@ part '1111/22/new_name.dart';
 
   void _createRefactoring(String newName) {
     refactoring = new MoveFileRefactoring(
-        provider.pathContext,
-        searchEngine,
-        context,
-        testSource);
+        provider, searchEngine, context, testSource, null);
     refactoring.newFile = newName;
   }
 

@@ -19,15 +19,15 @@ import 'package:analyzer/src/generated/error.dart';
 import 'package:analyzer/src/generated/html.dart';
 import 'package:analyzer/src/generated/source.dart';
 
-
 /**
  * Schedules indexing of the given [file] using the resolved [dartUnit].
  */
 void scheduleIndexOperation(AnalysisServer server, String file,
     AnalysisContext context, CompilationUnit dartUnit) {
-  server.addOperation(new _DartIndexOperation(context, file, dartUnit));
+  if (server.index != null) {
+    server.addOperation(new _DartIndexOperation(context, file, dartUnit));
+  }
 }
-
 
 /**
  * Schedules sending notifications for the given [file] using the resolved
@@ -36,14 +36,9 @@ void scheduleIndexOperation(AnalysisServer server, String file,
 void scheduleNotificationOperations(AnalysisServer server, String file,
     LineInfo lineInfo, AnalysisContext context, CompilationUnit parsedDartUnit,
     CompilationUnit resolvedDartUnit, List<AnalysisError> errors) {
-  // Only send notifications if the current context is the preferred
-  // context for the file.  This avoids redundant notification messages
-  // being sent to the client (see dartbug.com/22210).
-  // TODO(paulberry): note that there is a small risk that this will cause
-  // notifications to be lost if the preferred context for a file changes
-  // while analysis is in progress (e.g. because the client sent an
-  // analysis.setAnalysisRoots message).
-  if (server.getAnalysisContext(file) != context) {
+  // If the file belongs to any analysis root, check whether we're in it now.
+  AnalysisContext containingContext = server.getContainingContext(file);
+  if (containingContext != null && context != containingContext) {
     return;
   }
   // Dart
@@ -51,45 +46,39 @@ void scheduleNotificationOperations(AnalysisServer server, String file,
       resolvedDartUnit != null ? resolvedDartUnit : parsedDartUnit;
   if (resolvedDartUnit != null) {
     if (server.hasAnalysisSubscription(
-        protocol.AnalysisService.HIGHLIGHTS,
-        file)) {
+        protocol.AnalysisService.HIGHLIGHTS, file)) {
       server.scheduleOperation(
-          new _DartHighlightsOperation(file, resolvedDartUnit));
+          new _DartHighlightsOperation(context, file, resolvedDartUnit));
     }
     if (server.hasAnalysisSubscription(
-        protocol.AnalysisService.NAVIGATION,
-        file)) {
+        protocol.AnalysisService.NAVIGATION, file)) {
       server.scheduleOperation(
-          new _DartNavigationOperation(file, resolvedDartUnit));
+          new _DartNavigationOperation(context, file, resolvedDartUnit));
     }
     if (server.hasAnalysisSubscription(
-        protocol.AnalysisService.OCCURRENCES,
-        file)) {
+        protocol.AnalysisService.OCCURRENCES, file)) {
       server.scheduleOperation(
-          new _DartOccurrencesOperation(file, resolvedDartUnit));
+          new _DartOccurrencesOperation(context, file, resolvedDartUnit));
     }
     if (server.hasAnalysisSubscription(
-        protocol.AnalysisService.OVERRIDES,
-        file)) {
+        protocol.AnalysisService.OVERRIDES, file)) {
       server.scheduleOperation(
-          new _DartOverridesOperation(file, resolvedDartUnit));
+          new _DartOverridesOperation(context, file, resolvedDartUnit));
     }
   }
   if (dartUnit != null) {
     if (server.hasAnalysisSubscription(
-        protocol.AnalysisService.OUTLINE,
-        file)) {
+        protocol.AnalysisService.OUTLINE, file)) {
       server.scheduleOperation(
-          new _DartOutlineOperation(file, lineInfo, dartUnit));
+          new _DartOutlineOperation(context, file, lineInfo, dartUnit));
     }
   }
   // errors
   if (server.shouldSendErrorsNotificationFor(file)) {
     server.scheduleOperation(
-        new _NotificationErrorsOperation(file, lineInfo, errors));
+        new _NotificationErrorsOperation(context, file, lineInfo, errors));
   }
 }
-
 
 void sendAnalysisNotificationErrors(AnalysisServer server, String file,
     LineInfo lineInfo, List<AnalysisError> errors) {
@@ -104,8 +93,18 @@ void sendAnalysisNotificationErrors(AnalysisServer server, String file,
   });
 }
 
-void sendAnalysisNotificationHighlights(AnalysisServer server, String file,
-    CompilationUnit dartUnit) {
+void sendAnalysisNotificationFlushResults(
+    AnalysisServer server, List<String> files) {
+  _sendNotification(server, () {
+    if (files != null && files.isNotEmpty) {
+      var params = new protocol.AnalysisFlushResultsParams(files);
+      server.sendNotification(params.toNotification());
+    }
+  });
+}
+
+void sendAnalysisNotificationHighlights(
+    AnalysisServer server, String file, CompilationUnit dartUnit) {
   _sendNotification(server, () {
     var regions = new DartUnitHighlightsComputer(dartUnit).compute();
     var params = new protocol.AnalysisHighlightsParams(file, regions);
@@ -113,31 +112,25 @@ void sendAnalysisNotificationHighlights(AnalysisServer server, String file,
   });
 }
 
-
-void sendAnalysisNotificationNavigation(AnalysisServer server, String file,
-    CompilationUnit dartUnit) {
+void sendAnalysisNotificationNavigation(
+    AnalysisServer server, String file, CompilationUnit dartUnit) {
   _sendNotification(server, () {
     var computer = new DartUnitNavigationComputer(dartUnit);
     computer.compute();
     var params = new protocol.AnalysisNavigationParams(
-        file,
-        computer.regions,
-        computer.targets,
-        computer.files);
+        file, computer.regions, computer.targets, computer.files);
     server.sendNotification(params.toNotification());
   });
 }
 
-
-void sendAnalysisNotificationOccurrences(AnalysisServer server, String file,
-    CompilationUnit dartUnit) {
+void sendAnalysisNotificationOccurrences(
+    AnalysisServer server, String file, CompilationUnit dartUnit) {
   _sendNotification(server, () {
     var occurrences = new DartUnitOccurrencesComputer(dartUnit).compute();
     var params = new protocol.AnalysisOccurrencesParams(file, occurrences);
     server.sendNotification(params.toNotification());
   });
 }
-
 
 void sendAnalysisNotificationOutline(AnalysisServer server, String file,
     LineInfo lineInfo, CompilationUnit dartUnit) {
@@ -149,16 +142,14 @@ void sendAnalysisNotificationOutline(AnalysisServer server, String file,
   });
 }
 
-
-void sendAnalysisNotificationOverrides(AnalysisServer server, String file,
-    CompilationUnit dartUnit) {
+void sendAnalysisNotificationOverrides(
+    AnalysisServer server, String file, CompilationUnit dartUnit) {
   _sendNotification(server, () {
     var overrides = new DartUnitOverridesComputer(dartUnit).compute();
     var params = new protocol.AnalysisOverridesParams(file, overrides);
     server.sendNotification(params.toNotification());
   });
 }
-
 
 /**
  * Runs the given notification producing function [f], catching exceptions.
@@ -173,7 +164,6 @@ void _sendNotification(AnalysisServer server, f()) {
   });
 }
 
-
 /**
  * Instances of [PerformAnalysisOperation] perform a single analysis task.
  */
@@ -181,10 +171,10 @@ class PerformAnalysisOperation extends ServerOperation {
   static const int IDLE_CACHE_SIZE = AnalysisOptionsImpl.DEFAULT_CACHE_SIZE;
   static const int WORKING_CACHE_SIZE = 512;
 
-  final AnalysisContext context;
   final bool isContinue;
 
-  PerformAnalysisOperation(this.context, this.isContinue);
+  PerformAnalysisOperation(AnalysisContext context, this.isContinue)
+      : super(context);
 
   @override
   ServerOperationPriority get priority {
@@ -203,9 +193,8 @@ class PerformAnalysisOperation extends ServerOperation {
     }
   }
 
-  bool get _isPriorityContext =>
-      context is InternalAnalysisContext &&
-          (context as InternalAnalysisContext).prioritySources.isNotEmpty;
+  bool get _isPriorityContext => context is InternalAnalysisContext &&
+      (context as InternalAnalysisContext).prioritySources.isNotEmpty;
 
   @override
   void perform(AnalysisServer server) {
@@ -226,8 +215,7 @@ class PerformAnalysisOperation extends ServerOperation {
     if (notices == null) {
       _setCacheSize(IDLE_CACHE_SIZE);
       server.sendContextAnalysisDoneNotifications(
-          context,
-          AnalysisDoneReason.COMPLETE);
+          context, AnalysisDoneReason.COMPLETE);
       return;
     }
     // process results
@@ -250,14 +238,8 @@ class PerformAnalysisOperation extends ServerOperation {
       // Dart
       CompilationUnit parsedDartUnit = notice.parsedDartUnit;
       CompilationUnit resolvedDartUnit = notice.resolvedDartUnit;
-      scheduleNotificationOperations(
-          server,
-          file,
-          notice.lineInfo,
-          context,
-          parsedDartUnit,
-          resolvedDartUnit,
-          notice.errors);
+      scheduleNotificationOperations(server, file, notice.lineInfo, context,
+          parsedDartUnit, resolvedDartUnit, notice.errors);
       // done
       server.fileAnalyzed(notice);
     }
@@ -271,8 +253,7 @@ class PerformAnalysisOperation extends ServerOperation {
   }
 
   void _updateIndex(AnalysisServer server, List<ChangeNotice> notices) {
-    Index index = server.index;
-    if (index == null) {
+    if (server.index == null) {
       return;
     }
     for (ChangeNotice notice in notices) {
@@ -299,10 +280,10 @@ class PerformAnalysisOperation extends ServerOperation {
   }
 }
 
-
 class _DartHighlightsOperation extends _DartNotificationOperation {
-  _DartHighlightsOperation(String file, CompilationUnit unit)
-      : super(file, unit);
+  _DartHighlightsOperation(
+      AnalysisContext context, String file, CompilationUnit unit)
+      : super(context, file, unit);
 
   @override
   void perform(AnalysisServer server) {
@@ -310,12 +291,11 @@ class _DartHighlightsOperation extends _DartNotificationOperation {
   }
 }
 
-
 class _DartIndexOperation extends _SingleFileOperation {
-  final AnalysisContext context;
   final CompilationUnit unit;
 
-  _DartIndexOperation(this.context, String file, this.unit) : super(file);
+  _DartIndexOperation(AnalysisContext context, String file, this.unit)
+      : super(context, file);
 
   @override
   ServerOperationPriority get priority {
@@ -331,10 +311,10 @@ class _DartIndexOperation extends _SingleFileOperation {
   }
 }
 
-
 class _DartNavigationOperation extends _DartNotificationOperation {
-  _DartNavigationOperation(String file, CompilationUnit unit)
-      : super(file, unit);
+  _DartNavigationOperation(
+      AnalysisContext context, String file, CompilationUnit unit)
+      : super(context, file, unit);
 
   @override
   void perform(AnalysisServer server) {
@@ -342,11 +322,11 @@ class _DartNavigationOperation extends _DartNotificationOperation {
   }
 }
 
-
 abstract class _DartNotificationOperation extends _SingleFileOperation {
   final CompilationUnit unit;
 
-  _DartNotificationOperation(String file, this.unit) : super(file);
+  _DartNotificationOperation(AnalysisContext context, String file, this.unit)
+      : super(context, file);
 
   @override
   ServerOperationPriority get priority {
@@ -354,10 +334,10 @@ abstract class _DartNotificationOperation extends _SingleFileOperation {
   }
 }
 
-
 class _DartOccurrencesOperation extends _DartNotificationOperation {
-  _DartOccurrencesOperation(String file, CompilationUnit unit)
-      : super(file, unit);
+  _DartOccurrencesOperation(
+      AnalysisContext context, String file, CompilationUnit unit)
+      : super(context, file, unit);
 
   @override
   void perform(AnalysisServer server) {
@@ -365,12 +345,12 @@ class _DartOccurrencesOperation extends _DartNotificationOperation {
   }
 }
 
-
 class _DartOutlineOperation extends _DartNotificationOperation {
   final LineInfo lineInfo;
 
-  _DartOutlineOperation(String file, this.lineInfo, CompilationUnit unit)
-      : super(file, unit);
+  _DartOutlineOperation(
+      AnalysisContext context, String file, this.lineInfo, CompilationUnit unit)
+      : super(context, file, unit);
 
   @override
   void perform(AnalysisServer server) {
@@ -378,10 +358,10 @@ class _DartOutlineOperation extends _DartNotificationOperation {
   }
 }
 
-
 class _DartOverridesOperation extends _DartNotificationOperation {
-  _DartOverridesOperation(String file, CompilationUnit unit)
-      : super(file, unit);
+  _DartOverridesOperation(
+      AnalysisContext context, String file, CompilationUnit unit)
+      : super(context, file, unit);
 
   @override
   void perform(AnalysisServer server) {
@@ -389,12 +369,11 @@ class _DartOverridesOperation extends _DartNotificationOperation {
   }
 }
 
-
 class _HtmlIndexOperation extends _SingleFileOperation {
-  final AnalysisContext context;
   final HtmlUnit unit;
 
-  _HtmlIndexOperation(this.context, String file, this.unit) : super(file);
+  _HtmlIndexOperation(AnalysisContext context, String file, this.unit)
+      : super(context, file);
 
   @override
   ServerOperationPriority get priority {
@@ -408,13 +387,13 @@ class _HtmlIndexOperation extends _SingleFileOperation {
   }
 }
 
-
 class _NotificationErrorsOperation extends _SingleFileOperation {
   final LineInfo lineInfo;
   final List<AnalysisError> errors;
 
-  _NotificationErrorsOperation(String file, this.lineInfo, this.errors)
-      : super(file);
+  _NotificationErrorsOperation(
+      AnalysisContext context, String file, this.lineInfo, this.errors)
+      : super(context, file);
 
   @override
   ServerOperationPriority get priority {
@@ -427,11 +406,10 @@ class _NotificationErrorsOperation extends _SingleFileOperation {
   }
 }
 
-
 abstract class _SingleFileOperation extends SourceSensitiveOperation {
   final String file;
 
-  _SingleFileOperation(this.file);
+  _SingleFileOperation(AnalysisContext context, this.file) : super(context);
 
   @override
   bool shouldBeDiscardedOnSourceChange(Source source) {

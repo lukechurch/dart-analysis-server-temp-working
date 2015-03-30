@@ -16,12 +16,10 @@ import 'package:unittest/unittest.dart';
 import '../mocks.dart';
 import '../reflective_tests.dart';
 
-
 main() {
   groupSep = ' | ';
   runReflectiveTests(ServerOperationQueueTest);
 }
-
 
 /**
  *  Return a [ServerOperation] mock with the given priority.
@@ -32,24 +30,20 @@ ServerOperation mockOperation(ServerOperationPriority priority) {
   return operation;
 }
 
-
 class AnalysisContextMock extends TypedMock implements InternalAnalysisContext {
   List<Source> prioritySources = <Source>[];
 
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-
 class AnalysisServerMock extends TypedMock implements AnalysisServer {
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-
-class ServerContextManagerMock extends TypedMock implements ServerContextManager
-    {
+class ServerContextManagerMock extends TypedMock
+    implements ServerContextManager {
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
-
 
 @reflectiveTest
 class ServerOperationQueueTest {
@@ -65,6 +59,30 @@ class ServerOperationQueueTest {
     // clear - no operations
     queue.clear();
     expect(queue.isEmpty, true);
+  }
+
+  void test_contextRemoved() {
+    var contextA = new AnalysisContextMock();
+    var contextB = new AnalysisContextMock();
+    var opA1 = new _ServerOperationMock(contextA);
+    var opA2 = new _ServerOperationMock(contextA);
+    var opB1 = new _ServerOperationMock(contextB);
+    var opB2 = new _ServerOperationMock(contextB);
+    when(opA1.priority)
+        .thenReturn(ServerOperationPriority.ANALYSIS_NOTIFICATION);
+    when(opA2.priority)
+        .thenReturn(ServerOperationPriority.ANALYSIS_NOTIFICATION);
+    when(opB1.priority)
+        .thenReturn(ServerOperationPriority.ANALYSIS_NOTIFICATION);
+    when(opB2.priority)
+        .thenReturn(ServerOperationPriority.ANALYSIS_NOTIFICATION);
+    queue.add(opA1);
+    queue.add(opB1);
+    queue.add(opA2);
+    queue.add(opB2);
+    queue.contextRemoved(contextA);
+    expect(queue.take(), same(opB1));
+    expect(queue.take(), same(opB2));
   }
 
   void test_isEmpty_false() {
@@ -153,8 +171,11 @@ class ServerOperationQueueTest {
   }
 }
 
-
 class _ServerOperationMock extends TypedMock implements ServerOperation {
+  final AnalysisContext context;
+
+  _ServerOperationMock([this.context]);
+
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -162,8 +183,8 @@ class _SourceMock extends TypedMock implements Source {
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _SourceSensitiveOperationMock extends TypedMock implements
-    SourceSensitiveOperation {
+class _SourceSensitiveOperationMock extends TypedMock
+    implements SourceSensitiveOperation {
   final Source source;
 
   _SourceSensitiveOperationMock(this.source);

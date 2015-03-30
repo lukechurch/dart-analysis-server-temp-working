@@ -7,8 +7,8 @@ library services.completion.dart.cache;
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:analysis_server/src/protocol_server.dart' hide Element,
-    ElementKind;
+import 'package:analysis_server/src/protocol_server.dart'
+    hide Element, ElementKind;
 import 'package:analysis_server/src/services/completion/completion_manager.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_manager.dart';
 import 'package:analysis_server/src/services/completion/suggestion_builder.dart';
@@ -54,6 +54,12 @@ class DartCompletionCache extends CompletionCache {
    * or `null` if nothing has been cached.
    */
   List<CompletionSuggestion> otherImportedSuggestions;
+
+  /**
+   * Suggestions for constructors
+   * or `null` if nothing has been cached.
+   */
+  List<CompletionSuggestion> importedConstructorSuggestions;
 
   /**
    * A collection of all imported completions
@@ -111,6 +117,7 @@ class DartCompletionCache extends CompletionCache {
     importedTypeSuggestions = <CompletionSuggestion>[];
     libraryPrefixSuggestions = <CompletionSuggestion>[];
     otherImportedSuggestions = <CompletionSuggestion>[];
+    importedConstructorSuggestions = <CompletionSuggestion>[];
     importedVoidReturnSuggestions = <CompletionSuggestion>[];
     importedClassMap = new Map<String, ClassElement>();
     _importedCompletions = new HashSet<String>();
@@ -147,16 +154,17 @@ class DartCompletionCache extends CompletionCache {
     // Add non-imported elements as low relevance
     // after the imported element suggestions have been added
     Future<bool> futureAllCached = futureImportsCached.then((_) {
-      return searchEngine.searchTopLevelDeclarations(
-          '').then((List<SearchMatch> matches) {
+      return searchEngine
+          .searchTopLevelDeclarations('')
+          .then((List<SearchMatch> matches) {
         _addNonImportedElementSuggestions(matches, excludedLibs);
         return true;
       });
     });
 
-    return shouldWaitForLowPrioritySuggestions ?
-        futureAllCached :
-        futureImportsCached;
+    return shouldWaitForLowPrioritySuggestions
+        ? futureAllCached
+        : futureImportsCached;
   }
 
   /**
@@ -167,11 +175,34 @@ class DartCompletionCache extends CompletionCache {
       _importKey != null && _importKey == _computeImportKey(unit);
 
   /**
+   * Add constructor suggestions for the given class.
+   */
+  void _addConstructorSuggestions(ClassElement classElem, int relevance) {
+    String className = classElem.name;
+    for (ConstructorElement constructor in classElem.constructors) {
+      if (!constructor.isPrivate) {
+        CompletionSuggestion suggestion =
+            createSuggestion(constructor, relevance: relevance);
+        String name = suggestion.completion;
+        name = name.length > 0 ? '$className.$name' : className;
+        suggestion.completion = name;
+        suggestion.selectionOffset = suggestion.completion.length;
+        importedConstructorSuggestions.add(suggestion);
+      }
+    }
+  }
+
+  /**
    * Add suggestions for implicitly imported elements in dart:core.
    */
   void _addDartCoreSuggestions() {
     Source coreUri = context.sourceFactory.forUri('dart:core');
     LibraryElement coreLib = context.getLibraryElement(coreUri);
+    if (coreLib == null) {
+      // If the core library has not been analyzed yet, then we cannot add any
+      // suggestions from it.
+      return;
+    }
     Namespace coreNamespace =
         new NamespaceBuilder().createPublicNamespaceForLibrary(coreLib);
     coreNamespace.definedNames.forEach((String name, Element elem) {
@@ -195,8 +226,8 @@ class DartCompletionCache extends CompletionCache {
           ImportElement importElem = directive.element;
           if (importElem != null && importElem.importedLibrary != null) {
             if (directive.prefix == null) {
-              Namespace importNamespace =
-                  new NamespaceBuilder().createImportNamespaceForDirective(importElem);
+              Namespace importNamespace = new NamespaceBuilder()
+                  .createImportNamespaceForDirective(importElem);
               // Include top level elements
               importNamespace.definedNames.forEach((String name, Element elem) {
                 if (elem is ClassElement) {
@@ -228,14 +259,9 @@ class DartCompletionCache extends CompletionCache {
     CompletionSuggestion suggestion = null;
     String completion = importElem.prefix.displayName;
     if (completion != null && completion.length > 0) {
-      suggestion = new CompletionSuggestion(
-          CompletionSuggestionKind.INVOCATION,
-          DART_RELEVANCE_DEFAULT,
-          completion,
-          completion.length,
-          0,
-          importElem.isDeprecated,
-          false);
+      suggestion = new CompletionSuggestion(CompletionSuggestionKind.INVOCATION,
+          DART_RELEVANCE_DEFAULT, completion, completion.length, 0,
+          importElem.isDeprecated, false);
       LibraryElement lib = importElem.importedLibrary;
       if (lib != null) {
         suggestion.element = newElement_fromEngine(lib);
@@ -249,12 +275,13 @@ class DartCompletionCache extends CompletionCache {
    * Add suggestions for all top level elements in the context
    * excluding those elemnents for which suggestions have already been added.
    */
-  void _addNonImportedElementSuggestions(List<SearchMatch> matches,
-      Set<LibraryElement> excludedLibs) {
+  void _addNonImportedElementSuggestions(
+      List<SearchMatch> matches, Set<LibraryElement> excludedLibs) {
+    AnalysisContext sdkContext = context.sourceFactory.dartSdk.context;
     matches.forEach((SearchMatch match) {
       if (match.kind == MatchKind.DECLARATION) {
         Element element = match.element;
-        if (element.context == context &&
+        if ((element.context == context || element.context == sdkContext) &&
             element.isPublic &&
             !excludedLibs.contains(element.library) &&
             !_importedCompletions.contains(element.displayName)) {
@@ -268,7 +295,6 @@ class DartCompletionCache extends CompletionCache {
    * Add a suggestion for the given element.
    */
   void _addSuggestion(Element element, int relevance) {
-
     if (element is ExecutableElement) {
       if (element.isOperator) {
         return;
@@ -285,8 +311,11 @@ class DartCompletionCache extends CompletionCache {
       } else {
         otherImportedSuggestions.add(suggestion);
       }
+    } else if (element is FunctionTypeAliasElement) {
+      importedTypeSuggestions.add(suggestion);
     } else if (element is ClassElement) {
       importedTypeSuggestions.add(suggestion);
+      _addConstructorSuggestions(element, relevance);
     } else {
       otherImportedSuggestions.add(suggestion);
     }
@@ -308,8 +337,8 @@ class DartCompletionCache extends CompletionCache {
    * Compute the library unit for the given library source,
    * where the [unit] is the resolved compilation unit associated with [source].
    */
-  Future<CompilationUnit> _computeLibUnit(Source libSource,
-      CompilationUnit unit) {
+  Future<CompilationUnit> _computeLibUnit(
+      Source libSource, CompilationUnit unit) {
     // If the sources are the same then we already have the library unit
     if (libSource == source) {
       return new Future.value(unit);

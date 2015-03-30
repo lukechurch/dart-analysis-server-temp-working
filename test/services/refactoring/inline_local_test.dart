@@ -13,12 +13,10 @@ import 'package:unittest/unittest.dart';
 import '../../reflective_tests.dart';
 import 'abstract_refactoring.dart';
 
-
 main() {
   groupSep = ' | ';
   runReflectiveTests(InlineLocalTest);
 }
-
 
 @reflectiveTest
 class InlineLocalTest extends RefactoringTest {
@@ -69,9 +67,7 @@ main() {
 ''');
     _createRefactoring('test = 0');
     RefactoringStatus status = await refactoring.checkInitialConditions();
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.FATAL,
+    assertRefactoringStatus(status, RefactoringProblemSeverity.FATAL,
         expectedContextSearch: 'test = 1');
   }
 
@@ -84,9 +80,7 @@ main() {
 ''');
     _createRefactoring('test = 0');
     RefactoringStatus status = await refactoring.checkInitialConditions();
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.FATAL,
+    assertRefactoringStatus(status, RefactoringProblemSeverity.FATAL,
         expectedContextSearch: 'test += 1');
   }
 
@@ -261,6 +255,29 @@ main() {
   String b = "aaa bbb";
 }
 ''');
+  }
+
+  test_OK_intoStringInterpolation_string_multiLineIntoMulti_leadingSpaces() {
+    indexTestUnit(r"""
+main() {
+  String a = '''\ \
+a
+a''';
+  String b = '''
+$a
+bbb''';
+}
+""");
+    _createRefactoring('a =');
+    // validate change
+    return assertSuccessfulRefactoring(r"""
+main() {
+  String b = '''
+a
+a
+bbb''';
+}
+""");
   }
 
   test_OK_intoStringInterpolation_string_multiLineIntoMulti_unixEOL() {
@@ -572,11 +589,9 @@ main() {
   void _assert_fatalError_selection(RefactoringStatus status) {
     expect(refactoring.variableName, isNull);
     expect(refactoring.referenceCount, 0);
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.FATAL,
+    assertRefactoringStatus(status, RefactoringProblemSeverity.FATAL,
         expectedMessage: 'Local variable declaration or reference must be '
-            'selected to activate this refactoring.');
+        'selected to activate this refactoring.');
   }
 
   void _createRefactoring(String search) {

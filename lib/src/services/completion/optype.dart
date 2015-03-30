@@ -16,6 +16,11 @@ import 'package:analyzer/src/generated/scanner.dart';
 class OpType {
 
   /**
+   * Indicates whether constructor suggestions should be included.
+   */
+  bool includeConstructorSuggestions = false;
+
+  /**
    * Indicates whether invocation suggestions should be included.
    */
   bool includeInvocationSuggestions = false;
@@ -53,8 +58,8 @@ class OpType {
    */
   factory OpType.forCompletion(CompletionTarget target, int offset) {
     OpType optype = new OpType._();
-    target.containingNode.accept(
-        new _OpTypeAstVisitor(optype, target.entity, offset));
+    target.containingNode
+        .accept(new _OpTypeAstVisitor(optype, target.entity, offset));
     return optype;
   }
 
@@ -63,20 +68,10 @@ class OpType {
   /**
    * Indicate whether only type names should be suggested
    */
-  bool get includeOnlyTypeNameSuggestions =>
-      includeTypeNameSuggestions &&
-          !includeReturnValueSuggestions &&
-          !includeVoidReturnSuggestions &&
-          !includeInvocationSuggestions;
-
-  /**
-   * Indicate whether top level elements should be suggested
-   */
-  bool get includeTopLevelSuggestions =>
-      includeReturnValueSuggestions ||
-          includeTypeNameSuggestions ||
-          includeVoidReturnSuggestions;
-
+  bool get includeOnlyTypeNameSuggestions => includeTypeNameSuggestions &&
+      !includeReturnValueSuggestions &&
+      !includeVoidReturnSuggestions &&
+      !includeInvocationSuggestions;
 }
 
 class _OpTypeAstVisitor extends GeneralizingAstVisitor {
@@ -179,8 +174,7 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   }
 
   @override
-  void visitClassMember(ClassMember node) {
-  }
+  void visitClassMember(ClassMember node) {}
 
   @override
   void visitCommentReference(CommentReference node) {
@@ -190,7 +184,9 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   }
 
   void visitCompilationUnit(CompilationUnit node) {
-    optype.includeTypeNameSuggestions = true;
+    if (entity is! CommentToken) {
+      optype.includeTypeNameSuggestions = true;
+    }
   }
 
   @override
@@ -301,7 +297,6 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
 
   @override
   void visitFormalParameterList(FormalParameterList node) {
-    optype.includeReturnValueSuggestions = true;
     optype.includeTypeNameSuggestions = true;
   }
 
@@ -314,6 +309,20 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
     // the 2nd semicolon.  Return value suggestions only belong after the
     // e1st or second semicolon.
   }
+
+  @override
+  void visitFunctionDeclaration(FunctionDeclaration node) {
+    if (identical(entity, node.returnType) ||
+        identical(entity, node.name) && node.returnType == null) {
+      optype.includeTypeNameSuggestions = true;
+    }
+  }
+
+  @override
+  void visitFunctionExpression(FunctionExpression node) {}
+
+  @override
+  void visitFunctionExpressionInvocation(FunctionExpressionInvocation node) {}
 
   @override
   void visitFunctionTypeAlias(FunctionTypeAlias node) {
@@ -350,7 +359,7 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   @override
   void visitInstanceCreationExpression(InstanceCreationExpression node) {
     if (identical(entity, node.constructorName)) {
-      optype.includeTypeNameSuggestions = true;
+      optype.includeConstructorSuggestions = true;
     }
   }
 
@@ -358,7 +367,9 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   void visitInterpolationExpression(InterpolationExpression node) {
     if (identical(entity, node.expression)) {
       optype.includeReturnValueSuggestions = true;
-      optype.includeTypeNameSuggestions = true;
+      // Only include type names in a ${ } expression
+      optype.includeTypeNameSuggestions =
+          node.leftBracket != null && node.leftBracket.length > 1;
     }
   }
 
@@ -378,18 +389,19 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   }
 
   @override
-  void visitListLiteral(ListLiteral node) {
+  void visitMapLiteralEntry(MapLiteralEntry node) {
     optype.includeReturnValueSuggestions = true;
     optype.includeTypeNameSuggestions = true;
   }
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
+    optype.includeTypeNameSuggestions = true;
   }
 
   @override
   void visitMethodInvocation(MethodInvocation node) {
-    if (identical(entity, node.period) && offset > node.period.offset) {
+    if (identical(entity, node.operator) && offset > node.operator.offset) {
       // The cursor is between the two dots of a ".." token, so we need to
       // generate the completions we would generate after a "." token.
       optype.includeInvocationSuggestions = true;
@@ -422,6 +434,12 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
       optype.includeReturnValueSuggestions = true;
       optype.includeTypeNameSuggestions = true;
     }
+  }
+
+  @override
+  void visitPostfixExpression(PostfixExpression node) {
+    optype.includeReturnValueSuggestions = true;
+    optype.includeTypeNameSuggestions = true;
   }
 
   @override
@@ -489,6 +507,29 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   }
 
   @override
+  void visitThrowExpression(ThrowExpression node) {
+    optype.includeReturnValueSuggestions = true;
+    optype.includeTypeNameSuggestions = true;
+  }
+
+  @override
+  void visitTypeArgumentList(TypeArgumentList node) {
+    NodeList<TypeName> arguments = node.arguments;
+    for (TypeName typeName in arguments) {
+      if (identical(entity, typeName)) {
+        optype.includeTypeNameSuggestions = true;
+        break;
+      }
+    }
+  }
+
+  @override
+  void visitTypedLiteral(TypedLiteral node) {
+    optype.includeReturnValueSuggestions = true;
+    optype.includeTypeNameSuggestions = true;
+  }
+
+  @override
   void visitTypeName(TypeName node) {
     // The entity won't be the first child entity (node.name), since
     // CompletionTarget would have chosen an edge higher in the parse tree.  So
@@ -513,8 +554,15 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   }
 
   @override
-  void visitVariableDeclarationStatement(VariableDeclarationStatement node) {
+  void visitVariableDeclarationList(VariableDeclarationList node) {
+    if ((node.keyword == null || node.keyword.lexeme != 'var') &&
+        (node.type == null)) {
+      optype.includeTypeNameSuggestions = true;
+    }
   }
+
+  @override
+  void visitVariableDeclarationStatement(VariableDeclarationStatement node) {}
 
   @override
   void visitWhileStatement(WhileStatement node) {

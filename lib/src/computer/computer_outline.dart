@@ -10,7 +10,6 @@ import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/element.dart' as engine;
 import 'package:analyzer/src/generated/source.dart';
 
-
 /**
  * A computer for [CompilationUnit] outline.
  */
@@ -43,12 +42,8 @@ class DartUnitOutlineComputer {
               String fieldTypeName =
                   fieldType != null ? fieldType.toSource() : '';
               for (VariableDeclaration field in fields.variables) {
-                classContents.add(
-                    _newVariableOutline(
-                        fieldTypeName,
-                        ElementKind.FIELD,
-                        field,
-                        fieldDeclaration.isStatic));
+                classContents.add(_newVariableOutline(fieldTypeName,
+                    ElementKind.FIELD, field, fieldDeclaration.isStatic));
               }
             }
           }
@@ -74,12 +69,8 @@ class DartUnitOutlineComputer {
           TypeName fieldType = fields.type;
           String fieldTypeName = fieldType != null ? fieldType.toSource() : '';
           for (VariableDeclaration field in fields.variables) {
-            unitContents.add(
-                _newVariableOutline(
-                    fieldTypeName,
-                    ElementKind.TOP_LEVEL_VARIABLE,
-                    field,
-                    false));
+            unitContents.add(_newVariableOutline(
+                fieldTypeName, ElementKind.TOP_LEVEL_VARIABLE, field, false));
           }
         }
       }
@@ -147,11 +138,10 @@ class DartUnitOutlineComputer {
     // unit or class member
     if (parent is CompilationUnit) {
       firstOffset = 0;
-      siblings = (parent as CompilationUnit).declarations;
+      siblings = parent.declarations;
     } else if (parent is ClassDeclaration) {
-      ClassDeclaration classDeclaration = parent as ClassDeclaration;
-      firstOffset = classDeclaration.leftBracket.end;
-      siblings = classDeclaration.members;
+      firstOffset = parent.leftBracket.end;
+      siblings = parent.members;
     } else {
       int offset = node.offset;
       return new _SourceRegion(offset, endOffset - offset);
@@ -166,38 +156,31 @@ class DartUnitOutlineComputer {
     return new _SourceRegion(prevSiblingEnd, endOffset - prevSiblingEnd);
   }
 
-  Outline _newClassOutline(ClassDeclaration classDeclaration,
-      List<Outline> classContents) {
-    SimpleIdentifier nameNode = classDeclaration.name;
+  Outline _newClassOutline(ClassDeclaration node, List<Outline> classContents) {
+    SimpleIdentifier nameNode = node.name;
     String name = nameNode.name;
-    _SourceRegion sourceRegion = _getSourceRegion(classDeclaration);
-    Element element = new Element(
-        ElementKind.CLASS,
-        name,
-        Element.makeFlags(
+    _SourceRegion sourceRegion = _getSourceRegion(node);
+    Element element = new Element(ElementKind.CLASS, name, Element.makeFlags(
             isPrivate: Identifier.isPrivateName(name),
-            isDeprecated: _isDeprecated(classDeclaration),
-            isAbstract: classDeclaration.isAbstract),
-        location: _getLocationNode(nameNode));
-    return new Outline(
-        element,
-        sourceRegion.offset,
-        sourceRegion.length,
+            isDeprecated: _isDeprecated(node),
+            isAbstract: node.isAbstract),
+        location: _getLocationNode(nameNode),
+        typeParameters: _getTypeParametersStr(node.typeParameters));
+    return new Outline(element, sourceRegion.offset, sourceRegion.length,
         children: nullIfEmpty(classContents));
   }
 
-  Outline _newClassTypeAlias(ClassTypeAlias alias) {
-    SimpleIdentifier nameNode = alias.name;
+  Outline _newClassTypeAlias(ClassTypeAlias node) {
+    SimpleIdentifier nameNode = node.name;
     String name = nameNode.name;
-    _SourceRegion sourceRegion = _getSourceRegion(alias);
-    Element element = new Element(
-        ElementKind.CLASS_TYPE_ALIAS,
-        name,
-        Element.makeFlags(
-            isPrivate: Identifier.isPrivateName(name),
-            isDeprecated: _isDeprecated(alias),
-            isAbstract: alias.isAbstract),
-        location: _getLocationNode(nameNode));
+    _SourceRegion sourceRegion = _getSourceRegion(node);
+    Element element = new Element(ElementKind.CLASS_TYPE_ALIAS, name, Element
+            .makeFlags(
+                isPrivate: Identifier.isPrivateName(name),
+                isDeprecated: _isDeprecated(node),
+                isAbstract: node.isAbstract),
+        location: _getLocationNode(nameNode),
+        typeParameters: _getTypeParametersStr(node.typeParameters));
     return new Outline(element, sourceRegion.offset, sourceRegion.length);
   }
 
@@ -218,19 +201,14 @@ class DartUnitOutlineComputer {
     _SourceRegion sourceRegion = _getSourceRegion(constructor);
     FormalParameterList parameters = constructor.parameters;
     String parametersStr = parameters != null ? parameters.toSource() : '';
-    Element element = new Element(
-        ElementKind.CONSTRUCTOR,
-        name,
-        Element.makeFlags(
-            isPrivate: isPrivate,
-            isDeprecated: _isDeprecated(constructor)),
+    Element element = new Element(ElementKind.CONSTRUCTOR, name, Element
+            .makeFlags(
+                isPrivate: isPrivate, isDeprecated: _isDeprecated(constructor)),
         location: _getLocationOffsetLength(offset, length),
         parameters: parametersStr);
     List<Outline> contents = _addLocalFunctionOutlines(constructor.body);
     Outline outline = new Outline(
-        element,
-        sourceRegion.offset,
-        sourceRegion.length,
+        element, sourceRegion.offset, sourceRegion.length,
         children: nullIfEmpty(contents));
     return outline;
   }
@@ -239,12 +217,10 @@ class DartUnitOutlineComputer {
     SimpleIdentifier nameNode = node.name;
     String name = nameNode.name;
     _SourceRegion sourceRegion = _getSourceRegion(node);
-    Element element = new Element(
-        ElementKind.ENUM_CONSTANT,
-        name,
-        Element.makeFlags(
-            isPrivate: Identifier.isPrivateName(name),
-            isDeprecated: _isDeprecated(node)),
+    Element element = new Element(ElementKind.ENUM_CONSTANT, name, Element
+            .makeFlags(
+                isPrivate: Identifier.isPrivateName(name),
+                isDeprecated: _isDeprecated(node)),
         location: _getLocationNode(nameNode));
     return new Outline(element, sourceRegion.offset, sourceRegion.length);
   }
@@ -253,17 +229,11 @@ class DartUnitOutlineComputer {
     SimpleIdentifier nameNode = node.name;
     String name = nameNode.name;
     _SourceRegion sourceRegion = _getSourceRegion(node);
-    Element element = new Element(
-        ElementKind.ENUM,
-        name,
-        Element.makeFlags(
+    Element element = new Element(ElementKind.ENUM, name, Element.makeFlags(
             isPrivate: Identifier.isPrivateName(name),
             isDeprecated: _isDeprecated(node)),
         location: _getLocationNode(nameNode));
-    return new Outline(
-        element,
-        sourceRegion.offset,
-        sourceRegion.length,
+    return new Outline(element, sourceRegion.offset, sourceRegion.length,
         children: nullIfEmpty(children));
   }
 
@@ -284,10 +254,7 @@ class DartUnitOutlineComputer {
     _SourceRegion sourceRegion = _getSourceRegion(function);
     String parametersStr = parameters != null ? parameters.toSource() : '';
     String returnTypeStr = returnType != null ? returnType.toSource() : '';
-    Element element = new Element(
-        kind,
-        name,
-        Element.makeFlags(
+    Element element = new Element(kind, name, Element.makeFlags(
             isPrivate: Identifier.isPrivateName(name),
             isDeprecated: _isDeprecated(function),
             isStatic: isStatic),
@@ -296,30 +263,27 @@ class DartUnitOutlineComputer {
         returnType: returnTypeStr);
     List<Outline> contents = _addLocalFunctionOutlines(functionExpression.body);
     Outline outline = new Outline(
-        element,
-        sourceRegion.offset,
-        sourceRegion.length,
+        element, sourceRegion.offset, sourceRegion.length,
         children: nullIfEmpty(contents));
     return outline;
   }
 
-  Outline _newFunctionTypeAliasOutline(FunctionTypeAlias alias) {
-    TypeName returnType = alias.returnType;
-    SimpleIdentifier nameNode = alias.name;
+  Outline _newFunctionTypeAliasOutline(FunctionTypeAlias node) {
+    TypeName returnType = node.returnType;
+    SimpleIdentifier nameNode = node.name;
     String name = nameNode.name;
-    _SourceRegion sourceRegion = _getSourceRegion(alias);
-    FormalParameterList parameters = alias.parameters;
+    _SourceRegion sourceRegion = _getSourceRegion(node);
+    FormalParameterList parameters = node.parameters;
     String parametersStr = parameters != null ? parameters.toSource() : '';
     String returnTypeStr = returnType != null ? returnType.toSource() : '';
-    Element element = new Element(
-        ElementKind.FUNCTION_TYPE_ALIAS,
-        name,
-        Element.makeFlags(
-            isPrivate: Identifier.isPrivateName(name),
-            isDeprecated: _isDeprecated(alias)),
+    Element element = new Element(ElementKind.FUNCTION_TYPE_ALIAS, name, Element
+            .makeFlags(
+                isPrivate: Identifier.isPrivateName(name),
+                isDeprecated: _isDeprecated(node)),
         location: _getLocationNode(nameNode),
         parameters: parametersStr,
-        returnType: returnTypeStr);
+        returnType: returnTypeStr,
+        typeParameters: _getTypeParametersStr(node.typeParameters));
     return new Outline(element, sourceRegion.offset, sourceRegion.length);
   }
 
@@ -339,10 +303,7 @@ class DartUnitOutlineComputer {
     _SourceRegion sourceRegion = _getSourceRegion(method);
     String parametersStr = parameters != null ? parameters.toSource() : null;
     String returnTypeStr = returnType != null ? returnType.toSource() : '';
-    Element element = new Element(
-        kind,
-        name,
-        Element.makeFlags(
+    Element element = new Element(kind, name, Element.makeFlags(
             isPrivate: Identifier.isPrivateName(name),
             isDeprecated: _isDeprecated(method),
             isAbstract: method.isAbstract,
@@ -352,24 +313,24 @@ class DartUnitOutlineComputer {
         returnType: returnTypeStr);
     List<Outline> contents = _addLocalFunctionOutlines(method.body);
     Outline outline = new Outline(
-        element,
-        sourceRegion.offset,
-        sourceRegion.length,
+        element, sourceRegion.offset, sourceRegion.length,
         children: nullIfEmpty(contents));
     return outline;
   }
 
   Outline _newUnitOutline(List<Outline> unitContents) {
     Element element = new Element(
-        ElementKind.COMPILATION_UNIT,
-        '<unit>',
-        Element.makeFlags(),
+        ElementKind.COMPILATION_UNIT, '<unit>', Element.makeFlags(),
         location: _getLocationNode(unit));
-    return new Outline(
-        element,
-        unit.offset,
-        unit.length,
+    return new Outline(element, unit.offset, unit.length,
         children: nullIfEmpty(unitContents));
+  }
+
+  static String _getTypeParametersStr(TypeParameterList parameters) {
+    if (parameters == null) {
+      return null;
+    }
+    return parameters.toSource();
   }
 
   Outline _newVariableOutline(String typeName, ElementKind kind,
@@ -377,17 +338,13 @@ class DartUnitOutlineComputer {
     SimpleIdentifier nameNode = variable.name;
     String name = nameNode.name;
     _SourceRegion sourceRegion = _getSourceRegion(variable);
-    Element element = new Element(
-        kind,
-        name,
-        Element.makeFlags(
+    Element element = new Element(kind, name, Element.makeFlags(
             isPrivate: Identifier.isPrivateName(name),
             isDeprecated: _isDeprecated(variable),
             isStatic: isStatic,
             isConst: variable.isConst,
             isFinal: variable.isFinal),
-        location: _getLocationNode(nameNode),
-        returnType: typeName);
+        location: _getLocationNode(nameNode), returnType: typeName);
     Outline outline =
         new Outline(element, sourceRegion.offset, sourceRegion.length);
     return outline;
@@ -401,7 +358,6 @@ class DartUnitOutlineComputer {
     return element != null && element.isDeprecated;
   }
 }
-
 
 /**
  * A visitor for building local function outlines.
@@ -417,7 +373,6 @@ class _LocalFunctionOutlinesVisitor extends RecursiveAstVisitor {
     contents.add(outlineComputer._newFunctionOutline(node, false));
   }
 }
-
 
 /**
  * A range of characters.

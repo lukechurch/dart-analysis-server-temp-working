@@ -15,12 +15,10 @@ import 'package:unittest/unittest.dart';
 import '../../reflective_tests.dart';
 import 'abstract_refactoring.dart';
 
-
 main() {
   groupSep = ' | ';
   runReflectiveTests(ExtractMethodTest);
 }
-
 
 @reflectiveTest
 class ExtractMethodTest extends RefactoringTest {
@@ -421,7 +419,7 @@ main() {
     _createRefactoringForStartEndString('print(0', 'rint(1)');
     return _assertConditionsFatal(
         "The selection does not cover a set of statements or an expression. "
-            "Extend selection to a valid range.");
+        "Extend selection to a valid range.");
   }
 
   test_bad_statements_exit_notAllExecutionFlows() {
@@ -452,7 +450,7 @@ main() {
     _createRefactoringForStartEndComments();
     return _assertConditionsFatal(
         "Ambiguous return value: Selected block contains assignment(s) to "
-            "local variables and return statement.");
+        "local variables and return statement.");
   }
 
   test_bad_switchCase() {
@@ -468,7 +466,7 @@ main() {
     _createRefactoringForStartEndComments();
     return _assertConditionsFatal(
         "Selection must either cover whole switch statement "
-            "or parts of a single case block.");
+        "or parts of a single case block.");
   }
 
   test_bad_tokensBetweenLastNodeAndSelectionEnd() {
@@ -513,7 +511,7 @@ main() {
     _createRefactoringForStartEndComments();
     return _assertConditionsFatal(
         "Selection must either cover whole try statement or "
-            "parts of try, catch, or finally block.");
+        "parts of try, catch, or finally block.");
   }
 
   test_bad_try_catchBlock_complete() {
@@ -530,7 +528,7 @@ main() {
     _createRefactoringForStartEndComments();
     return _assertConditionsFatal(
         "Selection must either cover whole try statement or "
-            "parts of try, catch, or finally block.");
+        "parts of try, catch, or finally block.");
   }
 
   test_bad_try_catchBlock_exception() {
@@ -564,7 +562,7 @@ main() {
     _createRefactoringForStartEndComments();
     return _assertConditionsFatal(
         "Selection must either cover whole try statement or "
-            "parts of try, catch, or finally block.");
+        "parts of try, catch, or finally block.");
   }
 
   test_bad_try_tryBlock() {
@@ -581,7 +579,7 @@ main() {
     _createRefactoringForStartEndComments();
     return _assertConditionsFatal(
         "Selection must either cover whole try statement or "
-            "parts of try, catch, or finally block.");
+        "parts of try, catch, or finally block.");
   }
 
   test_bad_typeReference() {
@@ -623,6 +621,20 @@ main() {
     _createRefactoringForStartEndComments();
     return _assertConditionsFatal(
         "Operation not applicable to a while statement's expression and body.");
+  }
+
+  test_canExtractGetter_false_closure() async {
+    indexTestUnit('''
+main() {
+  useFunction((_) => true);
+}
+useFunction(filter(String p)) {}
+''');
+    _createRefactoringForString('(_) => true');
+    // apply refactoring
+    await assertRefactoringConditionsOK();
+    expect(refactoring.canCreateGetter, false);
+    expect(refactoring.createGetter, false);
   }
 
   test_canExtractGetter_false_fieldAssignment() async {
@@ -711,14 +723,12 @@ main() {
     // null
     refactoring.name = null;
     assertRefactoringStatus(
-        refactoring.checkName(),
-        RefactoringProblemSeverity.FATAL,
+        refactoring.checkName(), RefactoringProblemSeverity.FATAL,
         expectedMessage: "Method name must not be null.");
     // empty
     refactoring.name = '';
     assertRefactoringStatus(
-        refactoring.checkName(),
-        RefactoringProblemSeverity.FATAL,
+        refactoring.checkName(), RefactoringProblemSeverity.FATAL,
         expectedMessage: "Method name must not be empty.");
     // OK
     refactoring.name = 'res';
@@ -811,11 +821,8 @@ main() {
     _createRefactoringForString('(x) => x * k');
     // check
     RefactoringStatus status = await refactoring.checkInitialConditions();
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.FATAL,
-        expectedMessage:
-            'Cannot extract closure as method, it references 1 external variable(s).');
+    assertRefactoringStatus(status, RefactoringProblemSeverity.FATAL,
+        expectedMessage: 'Cannot extract closure as method, it references 1 external variable(s).');
   }
 
   test_closure_bad_referencesParameter() async {
@@ -828,11 +835,8 @@ main(int k) {
     _createRefactoringForString('(x) => x * k');
     // check
     RefactoringStatus status = await refactoring.checkInitialConditions();
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.FATAL,
-        expectedMessage:
-            'Cannot extract closure as method, it references 1 external variable(s).');
+    assertRefactoringStatus(status, RefactoringProblemSeverity.FATAL,
+        expectedMessage: 'Cannot extract closure as method, it references 1 external variable(s).');
   }
 
   test_fromTopLevelVariableInitializerClosure() {
@@ -856,135 +860,80 @@ num res() => 1 + X;
 ''');
   }
 
-  test_getExtractGetter_false_do() async {
+  test_getExtractGetter_expression_true_binaryExpression() async {
     indexTestUnit('''
 main() {
-// start
-  int v = 0;
-  do {
-    v++;
-  } while (v < 10);
-// end
-  print(v);
-}
-''');
-    _createRefactoringForStartEndComments();
-    // apply refactoring
-    await assertRefactoringConditionsOK();
-    expect(refactoring.createGetter, false);
-  }
-
-  test_getExtractGetter_false_for() async {
-    indexTestUnit('''
-main() {
-// start
-  int v = 0;
-  for (int i = 0; i < 10; i++) {
-    v += i;
-  }
-// end
-  print(v);
-}
-''');
-    _createRefactoringForStartEndComments();
-    // apply refactoring
-    await assertRefactoringConditionsOK();
-    expect(refactoring.createGetter, false);
-  }
-
-  test_getExtractGetter_false_forEach() async {
-    indexTestUnit('''
-main() {
-// start
-  int v = 0;
-  for (int i in [1, 2, 3]) {
-    v += i;
-  }
-// end
-  print(v);
-}
-''');
-    _createRefactoringForStartEndComments();
-    // apply refactoring
-    await assertRefactoringConditionsOK();
-    expect(refactoring.createGetter, false);
-  }
-
-  test_getExtractGetter_false_methodInvocation_expression() async {
-    indexTestUnit('''
-main() {
-  int v = calculateSomething() + 5;
-}
-int calculateSomething() => 42;
-''');
-    _createRefactoringForString('calculateSomething() + 5');
-    // apply refactoring
-    await assertRefactoringConditionsOK();
-    expect(refactoring.createGetter, false);
-  }
-
-  test_getExtractGetter_false_methodInvocation_statements() async {
-    indexTestUnit('''
-main() {
-// start
-  int v = calculateSomething();
-// end
-  print(v);
-}
-int calculateSomething() => 42;
-''');
-    _createRefactoringForStartEndComments();
-    // apply refactoring
-    await assertRefactoringConditionsOK();
-    expect(refactoring.createGetter, false);
-  }
-
-  test_getExtractGetter_false_while() async {
-    indexTestUnit('''
-main() {
-// start
-  int v = 0;
-  while (v < 10) {
-    v++;
-  }
-// end
-  print(v);
-}
-''');
-    _createRefactoringForStartEndComments();
-    // apply refactoring
-    await assertRefactoringConditionsOK();
-    expect(refactoring.createGetter, false);
-  }
-
-  test_getExtractGetter_true_simpleBlock() async {
-    indexTestUnit('''
-main() {
-// start
-  int v = 1 + 2;
-// end
-  print(v);
-}
-''');
-    _createRefactoringForStartEndComments();
-    // apply refactoring
-    await assertRefactoringConditionsOK();
-    expect(refactoring.createGetter, true);
-  }
-
-  test_getExtractGetter_true_singleExpression() async {
-    indexTestUnit('''
-main() {
-// start
-  int v = 1 + 2;
-// end
-  print(v);
+  print(1 + 2);
 }
 ''');
     _createRefactoringForString('1 + 2');
     // apply refactoring
     await assertRefactoringConditionsOK();
     expect(refactoring.createGetter, true);
+  }
+
+  test_getExtractGetter_expression_true_literal() async {
+    indexTestUnit('''
+main() {
+  print(42);
+}
+''');
+    _createRefactoringForString('42');
+    // apply refactoring
+    await assertRefactoringConditionsOK();
+    expect(refactoring.createGetter, true);
+  }
+
+  test_getExtractGetter_expression_true_prefixedExpression() async {
+    indexTestUnit('''
+main() {
+  print(!true);
+}
+''');
+    _createRefactoringForString('!true');
+    // apply refactoring
+    await assertRefactoringConditionsOK();
+    expect(refactoring.createGetter, true);
+  }
+
+  test_getExtractGetter_expression_true_prefixedIdentifier() async {
+    indexTestUnit('''
+main() {
+  print(myValue.isEven);
+}
+int get myValue => 42;
+''');
+    _createRefactoringForString('myValue.isEven');
+    // apply refactoring
+    await assertRefactoringConditionsOK();
+    expect(refactoring.createGetter, true);
+  }
+
+  test_getExtractGetter_expression_true_propertyAccess() async {
+    indexTestUnit('''
+main() {
+  print(1.isEven);
+}
+''');
+    _createRefactoringForString('1.isEven');
+    // apply refactoring
+    await assertRefactoringConditionsOK();
+    expect(refactoring.createGetter, true);
+  }
+
+  test_getExtractGetter_statements() async {
+    indexTestUnit('''
+main() {
+// start
+  int v = 0;
+// end
+  print(v);
+}
+''');
+    _createRefactoringForStartEndComments();
+    // apply refactoring
+    await assertRefactoringConditionsOK();
+    expect(refactoring.createGetter, false);
   }
 
   test_getRefactoringName_function() {
@@ -1022,8 +971,7 @@ main() {
     _createRefactoringWithSuffix('getSelectedItem()', '); // marker');
     // check names
     await refactoring.checkInitialConditions();
-    expect(
-        refactoring.names,
+    expect(refactoring.names,
         unorderedEquals(['selectedItem', 'item', 'my', 'treeItem2']));
   }
 
@@ -1037,10 +985,22 @@ main() {
     _createRefactoringForString('1 +  2');
     // apply refactoring
     await refactoring.checkInitialConditions();
-    expect(
-        refactoring.offsets,
+    expect(refactoring.offsets,
         unorderedEquals([findOffset('1 + 2'), findOffset('1 +  2')]));
     expect(refactoring.lengths, unorderedEquals([5, 6]));
+  }
+
+  test_returnType_closure() async {
+    indexTestUnit('''
+process(f(x)) {}
+main() {
+  process((x) => x * 2);
+}
+''');
+    _createRefactoringForString('(x) => x * 2');
+    // do check
+    await refactoring.checkInitialConditions();
+    expect(refactoring.returnType, '');
   }
 
   test_returnType_expression() async {
@@ -2466,25 +2426,19 @@ Future<int> newFuture() => null;
 
   Future _assertConditionsError(String message) async {
     RefactoringStatus status = await refactoring.checkAllConditions();
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.ERROR,
+    assertRefactoringStatus(status, RefactoringProblemSeverity.ERROR,
         expectedMessage: message);
   }
 
   Future _assertConditionsFatal(String message) async {
     RefactoringStatus status = await refactoring.checkAllConditions();
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.FATAL,
+    assertRefactoringStatus(status, RefactoringProblemSeverity.FATAL,
         expectedMessage: message);
   }
 
   Future _assertFinalConditionsError(String message) async {
     RefactoringStatus status = await refactoring.checkFinalConditions();
-    assertRefactoringStatus(
-        status,
-        RefactoringProblemSeverity.ERROR,
+    assertRefactoringStatus(status, RefactoringProblemSeverity.ERROR,
         expectedMessage: message);
   }
 
@@ -2516,8 +2470,8 @@ Future<int> newFuture() => null;
     _createRefactoring(offset, end - offset);
   }
 
-  void _createRefactoringForStartEndString(String startSearch,
-      String endSearch) {
+  void _createRefactoringForStartEndString(
+      String startSearch, String endSearch) {
     int offset = findOffset(startSearch);
     int end = findOffset(endSearch);
     _createRefactoring(offset, end - offset);

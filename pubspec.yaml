@@ -12,6 +12,7 @@ dependencies:
   logging: any
   path: any
   watcher: any
+  yaml: any
 dev_dependencies:
   html5lib: any
   mock: '>=0.11.0 <0.12.0'

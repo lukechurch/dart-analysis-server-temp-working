@@ -17,19 +17,22 @@ import '../../abstract_context.dart';
 import '../../abstract_single_unit.dart';
 import '../../reflective_tests.dart';
 
-
 main() {
   groupSep = ' | ';
   runReflectiveTests(FixProcessorTest);
 }
 
-
 typedef bool AnalysisErrorFilter(AnalysisError error);
-
 
 @reflectiveTest
 class FixProcessorTest extends AbstractSingleUnitTest {
-  AnalysisErrorFilter errorFilter = null;
+  AnalysisErrorFilter errorFilter = (AnalysisError error) {
+    return error.errorCode != HintCode.UNUSED_CATCH_CLAUSE &&
+        error.errorCode != HintCode.UNUSED_CATCH_STACK &&
+        error.errorCode != HintCode.UNUSED_ELEMENT &&
+        error.errorCode != HintCode.UNUSED_FIELD &&
+        error.errorCode != HintCode.UNUSED_LOCAL_VARIABLE;
+  };
 
   Fix fix;
   SourceChange change;
@@ -88,8 +91,8 @@ bool test() {
     return positions;
   }
 
-  List<LinkedEditSuggestion> expectedSuggestions(LinkedEditSuggestionKind kind,
-      List<String> values) {
+  List<LinkedEditSuggestion> expectedSuggestions(
+      LinkedEditSuggestionKind kind, List<String> values) {
     return values.map((value) {
       return new LinkedEditSuggestion(value, kind);
     }).toList();
@@ -98,6 +101,63 @@ bool test() {
   void setUp() {
     super.setUp();
     verifyNoTestUnitErrors = false;
+  }
+
+  void test_addFieldFormalParameters_hasRequiredParameter() {
+    resolveTestUnit('''
+class Test {
+  final int a;
+  final int b;
+  final int c;
+  Test(this.a);
+}
+''');
+    assertHasFix(FixKind.ADD_FIELD_FORMAL_PARAMETERS, '''
+class Test {
+  final int a;
+  final int b;
+  final int c;
+  Test(this.a, this.b, this.c);
+}
+''');
+  }
+
+  void test_addFieldFormalParameters_noParameters() {
+    resolveTestUnit('''
+class Test {
+  final int a;
+  final int b;
+  final int c;
+  Test();
+}
+''');
+    assertHasFix(FixKind.ADD_FIELD_FORMAL_PARAMETERS, '''
+class Test {
+  final int a;
+  final int b;
+  final int c;
+  Test(this.a, this.b, this.c);
+}
+''');
+  }
+
+  void test_addFieldFormalParameters_noRequiredParameter() {
+    resolveTestUnit('''
+class Test {
+  final int a;
+  final int b;
+  final int c;
+  Test([this.c]);
+}
+''');
+    assertHasFix(FixKind.ADD_FIELD_FORMAL_PARAMETERS, '''
+class Test {
+  final int a;
+  final int b;
+  final int c;
+  Test(this.a, this.b, [this.c]);
+}
+''');
   }
 
   void test_addSync_blockFunctionBody() {
@@ -288,6 +348,28 @@ class Test {
 }
 ''');
     _assertLinkedGroup(change.linkedEditGroups[0], ['Test v =', 'Test {']);
+  }
+
+  void test_createConstructor_forFinalFields() {
+    errorFilter = (AnalysisError error) {
+      return error.message.contains("'a'");
+    };
+    resolveTestUnit('''
+class Test {
+  final int a;
+  final int b = 2;
+  final int c;
+}
+''');
+    assertHasFix(FixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS, '''
+class Test {
+  final int a;
+  final int b = 2;
+  final int c;
+
+  Test(this.a, this.c);
+}
+''');
   }
 
   void test_createConstructor_insteadOfSyntheticDefault() {
@@ -524,6 +606,18 @@ class B extends A {
     assertNoFix(FixKind.CREATE_CONSTRUCTOR_SUPER);
   }
 
+  void test_createField_BAD_inEnum() {
+    resolveTestUnit('''
+enum MyEnum {
+  AAA, BBB
+}
+main() {
+  MyEnum.foo;
+}
+''');
+    assertNoFix(FixKind.CREATE_FIELD);
+  }
+
   void test_createField_BAD_inSDK() {
     resolveTestUnit('''
 main(List p) {
@@ -660,6 +754,46 @@ class A {
   main() {
     test;
   }
+}
+''');
+  }
+
+  void test_createField_hint() {
+    resolveTestUnit('''
+class A {
+}
+main(A a) {
+  var x = a;
+  int v = x.test;
+}
+''');
+    assertHasFix(FixKind.CREATE_FIELD, '''
+class A {
+  int test;
+}
+main(A a) {
+  var x = a;
+  int v = x.test;
+}
+''');
+  }
+
+  void test_createField_hint_setter() {
+    resolveTestUnit('''
+class A {
+}
+main(A a) {
+  var x = a;
+  x.test = 0;
+}
+''');
+    assertHasFix(FixKind.CREATE_FIELD, '''
+class A {
+  int test;
+}
+main(A a) {
+  var x = a;
+  x.test = 0;
 }
 ''');
   }
@@ -862,6 +996,24 @@ import 'my_file.dart';
     expect(fileEdit.edits[0].replacement, contains('library my.file;'));
   }
 
+  void test_createFile_forPart() {
+    testFile = '/my/project/bin/test.dart';
+    resolveTestUnit('''
+library my.lib;
+part 'my_part.dart';
+''');
+    AnalysisError error = _findErrorToFix();
+    fix = _assertHasFix(FixKind.CREATE_FILE, error);
+    change = fix.change;
+    // validate change
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/my/project/bin/my_part.dart');
+    expect(fileEdit.fileStamp, -1);
+    expect(fileEdit.edits[0].replacement, contains('part of my.lib;'));
+  }
+
   void test_createGetter_BAD_inSDK() {
     resolveTestUnit('''
 main(List p) {
@@ -869,6 +1021,26 @@ main(List p) {
 }
 ''');
     assertNoFix(FixKind.CREATE_GETTER);
+  }
+
+  void test_createGetter_hint_getter() {
+    resolveTestUnit('''
+class A {
+}
+main(A a) {
+  var x = a;
+  int v = x.test;
+}
+''');
+    assertHasFix(FixKind.CREATE_GETTER, '''
+class A {
+  int get test => null;
+}
+main(A a) {
+  var x = a;
+  int v = x.test;
+}
+''');
   }
 
   void test_createGetter_multiLevel() {
@@ -1678,8 +1850,7 @@ useFunction(int g(double a, String b)) {}
 ''');
   }
 
-  void
-      test_creationFunction_forFunctionType_method_targetClass_hasOtherMember() {
+  void test_creationFunction_forFunctionType_method_targetClass_hasOtherMember() {
     resolveTestUnit('''
 main(A a) {
   useFunction(a.test);
@@ -1736,6 +1907,71 @@ main() {
     assertHasFix(FixKind.INSERT_SEMICOLON, '''
 main() {
   print(0);
+}
+''');
+  }
+
+  void test_illegalAsyncReturnType_asyncLibrary_import() {
+    errorFilter = (AnalysisError error) {
+      return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
+    };
+    resolveTestUnit('''
+library main;
+int main() async {
+}
+''');
+    assertHasFix(FixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+library main;
+import 'dart:async';
+Future<int> main() async {
+}
+''');
+  }
+
+  void test_illegalAsyncReturnType_asyncLibrary_usePrefix() {
+    errorFilter = (AnalysisError error) {
+      return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
+    };
+    resolveTestUnit('''
+import 'dart:async' as al;
+int main() async {
+}
+''');
+    assertHasFix(FixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+import 'dart:async' as al;
+al.Future<int> main() async {
+}
+''');
+  }
+
+  void test_illegalAsyncReturnType_complexTypeName() {
+    errorFilter = (AnalysisError error) {
+      return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
+    };
+    resolveTestUnit('''
+import 'dart:async';
+List<int> main() async {
+}
+''');
+    assertHasFix(FixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+import 'dart:async';
+Future<List<int>> main() async {
+}
+''');
+  }
+
+  void test_illegalAsyncReturnType_void() {
+    errorFilter = (AnalysisError error) {
+      return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
+    };
+    resolveTestUnit('''
+import 'dart:async';
+void main() async {
+}
+''');
+    assertHasFix(FixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+import 'dart:async';
+Future main() async {
 }
 ''');
   }
@@ -2160,6 +2396,17 @@ abstract class B extends A {
 ''');
   }
 
+  void test_noException_1() {
+    resolveTestUnit('''
+main(p) {
+  p i s Null;
+}''');
+    List<AnalysisError> errors = context.computeErrors(testSource);
+    for (var error in errors) {
+      computeFixes(testUnit, error);
+    }
+  }
+
   void test_removeParentheses_inGetterDeclaration() {
     resolveTestUnit('''
 class A {
@@ -2204,6 +2451,46 @@ main(Object p) {
 main(Object p) {
   if (p is String) {
     String v = p;
+  }
+}
+''');
+  }
+
+  void test_removeUnusedCatchClause() {
+    errorFilter = (AnalysisError error) => true;
+    resolveTestUnit('''
+main() {
+  try {
+    throw 42;
+  } on int catch (e) {
+  }
+}
+''');
+    assertHasFix(FixKind.REMOVE_UNUSED_CATCH_CLAUSE, '''
+main() {
+  try {
+    throw 42;
+  } on int {
+  }
+}
+''');
+  }
+
+  void test_removeUnusedCatchStack() {
+    errorFilter = (AnalysisError error) => true;
+    resolveTestUnit('''
+main() {
+  try {
+    throw 42;
+  } catch (e, stack) {
+  }
+}
+''');
+    assertHasFix(FixKind.REMOVE_UNUSED_CATCH_STACK, '''
+main() {
+  try {
+    throw 42;
+  } catch (e) {
   }
 }
 ''');
@@ -2648,6 +2935,84 @@ main() {
 ''');
   }
 
+  void test_undefinedGetter_useSimilar_hint() {
+    resolveTestUnit('''
+class A {
+  int myField;
+}
+main(A a) {
+  var x = a;
+  print(x.myFild);
+}
+''');
+    assertHasFix(FixKind.CHANGE_TO, '''
+class A {
+  int myField;
+}
+main(A a) {
+  var x = a;
+  print(x.myField);
+}
+''');
+  }
+
+  void test_undefinedGetter_useSimilar_qualified() {
+    resolveTestUnit('''
+class A {
+  int myField;
+}
+main(A a) {
+  print(a.myFild);
+}
+''');
+    assertHasFix(FixKind.CHANGE_TO, '''
+class A {
+  int myField;
+}
+main(A a) {
+  print(a.myField);
+}
+''');
+  }
+
+  void test_undefinedGetter_useSimilar_qualified_static() {
+    resolveTestUnit('''
+class A {
+  static int MY_NAME = 1;
+}
+main() {
+  A.MY_NAM;
+}
+''');
+    assertHasFix(FixKind.CHANGE_TO, '''
+class A {
+  static int MY_NAME = 1;
+}
+main() {
+  A.MY_NAME;
+}
+''');
+  }
+
+  void test_undefinedGetter_useSimilar_unqualified() {
+    resolveTestUnit('''
+class A {
+  int myField;
+  main() {
+    print(myFild);
+  }
+}
+''');
+    assertHasFix(FixKind.CHANGE_TO, '''
+class A {
+  int myField;
+  main() {
+    print(myField);
+  }
+}
+''');
+  }
+
   void test_undefinedMethod_create_BAD_inSDK() {
     resolveTestUnit('''
 main() {
@@ -2837,31 +3202,27 @@ class A {
     // linked positions
     int index = 0;
     _assertLinkedGroup(
-        change.linkedEditGroups[index++],
-        ['void myUndefinedMethod(']);
-    _assertLinkedGroup(
-        change.linkedEditGroups[index++],
-        ['myUndefinedMethod(0', 'myUndefinedMethod(int']);
-    _assertLinkedGroup(
-        change.linkedEditGroups[index++],
-        ['int i'],
-        expectedSuggestions(
-            LinkedEditSuggestionKind.TYPE,
-            ['int', 'num', 'Object', 'Comparable']));
+        change.linkedEditGroups[index++], ['void myUndefinedMethod(']);
+    _assertLinkedGroup(change.linkedEditGroups[index++], [
+      'myUndefinedMethod(0',
+      'myUndefinedMethod(int'
+    ]);
+    _assertLinkedGroup(change.linkedEditGroups[index++], [
+      'int i'
+    ], expectedSuggestions(
+        LinkedEditSuggestionKind.TYPE, ['int', 'num', 'Object', 'Comparable']));
     _assertLinkedGroup(change.linkedEditGroups[index++], ['i,']);
-    _assertLinkedGroup(
-        change.linkedEditGroups[index++],
-        ['double d'],
-        expectedSuggestions(
-            LinkedEditSuggestionKind.TYPE,
-            ['double', 'num', 'Object', 'Comparable']));
+    _assertLinkedGroup(change.linkedEditGroups[index++], ['double d'],
+        expectedSuggestions(LinkedEditSuggestionKind.TYPE, [
+      'double',
+      'num',
+      'Object',
+      'Comparable'
+    ]));
     _assertLinkedGroup(change.linkedEditGroups[index++], ['d,']);
-    _assertLinkedGroup(
-        change.linkedEditGroups[index++],
-        ['String s'],
+    _assertLinkedGroup(change.linkedEditGroups[index++], ['String s'],
         expectedSuggestions(
-            LinkedEditSuggestionKind.TYPE,
-            ['String', 'Object', 'Comparable']));
+            LinkedEditSuggestionKind.TYPE, ['String', 'Object', 'Comparable']));
     _assertLinkedGroup(change.linkedEditGroups[index++], ['s)']);
   }
 
@@ -2885,9 +3246,10 @@ class A {
 ''');
     // linked positions
     _assertLinkedGroup(change.linkedEditGroups[0], ['int myUndefinedMethod(']);
-    _assertLinkedGroup(
-        change.linkedEditGroups[1],
-        ['myUndefinedMethod();', 'myUndefinedMethod() {']);
+    _assertLinkedGroup(change.linkedEditGroups[1], [
+      'myUndefinedMethod();',
+      'myUndefinedMethod() {'
+    ]);
   }
 
   void test_undefinedMethod_createUnqualified_staticFromField() {
@@ -3019,6 +3381,65 @@ class A {
 ''');
   }
 
+  void test_undefinedSetter_useSimilar_hint() {
+    resolveTestUnit('''
+class A {
+  int myField;
+}
+main(A a) {
+  var x = a;
+  x.myFild = 42;
+}
+''');
+    assertHasFix(FixKind.CHANGE_TO, '''
+class A {
+  int myField;
+}
+main(A a) {
+  var x = a;
+  x.myField = 42;
+}
+''');
+  }
+
+  void test_undefinedSetter_useSimilar_qualified() {
+    resolveTestUnit('''
+class A {
+  int myField;
+}
+main(A a) {
+  a.myFild = 42;
+}
+''');
+    assertHasFix(FixKind.CHANGE_TO, '''
+class A {
+  int myField;
+}
+main(A a) {
+  a.myField = 42;
+}
+''');
+  }
+
+  void test_undefinedSetter_useSimilar_unqualified() {
+    resolveTestUnit('''
+class A {
+  int myField;
+  main() {
+    myFild = 42;
+  }
+}
+''');
+    assertHasFix(FixKind.CHANGE_TO, '''
+class A {
+  int myField;
+  main() {
+    myField = 42;
+  }
+}
+''');
+  }
+
   void test_useEffectiveIntegerDivision() {
     resolveTestUnit('''
 main() {
@@ -3066,9 +3487,8 @@ main() {
     provider.newFile('/packages/my_pkg/lib/my_lib.dart', myLibCode);
     // configure SourceFactory
     Folder myPkgFolder = provider.getResource('/packages/my_pkg/lib');
-    UriResolver pkgResolver = new PackageMapUriResolver(provider, {
-      'my_pkg': [myPkgFolder]
-    });
+    UriResolver pkgResolver =
+        new PackageMapUriResolver(provider, {'my_pkg': [myPkgFolder]});
     context.sourceFactory = new SourceFactory(
         [AbstractContextTest.SDK_RESOLVER, resourceResolver, pkgResolver]);
     // force 'my_pkg' resolution
@@ -3077,11 +3497,6 @@ main() {
 
   AnalysisError _findErrorToFix() {
     List<AnalysisError> errors = context.computeErrors(testSource);
-    errors.removeWhere((error) {
-      return error.errorCode == HintCode.UNUSED_ELEMENT ||
-          error.errorCode == HintCode.UNUSED_FIELD ||
-          error.errorCode == HintCode.UNUSED_LOCAL_VARIABLE;
-    });
     if (errorFilter != null) {
       errors = errors.where(errorFilter).toList();
     }

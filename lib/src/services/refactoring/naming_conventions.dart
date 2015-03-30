@@ -6,7 +6,7 @@ library services.src.refactoring.naming_conventions;
 
 import 'package:analysis_server/src/services/correction/status.dart';
 import 'package:analysis_server/src/services/correction/strings.dart';
-
+import 'package:analyzer/src/generated/scanner.dart';
 
 /**
  * Returns the [RefactoringStatus] with severity:
@@ -102,10 +102,8 @@ RefactoringStatus validateLibraryName(String name) {
   // check identifiers
   List<String> identifiers = name.split('.');
   for (String identifier in identifiers) {
-    RefactoringStatus status = _validateIdentifier(
-        identifier,
-        "Library name identifier",
-        "a lowercase letter or underscore");
+    RefactoringStatus status = _validateIdentifier(identifier,
+        "Library name identifier", "a lowercase letter or underscore");
     if (!status.isOK) {
       return status;
     }
@@ -153,8 +151,8 @@ RefactoringStatus validateVariableName(String name) {
   return _validateLowerCamelCase(name, "Variable");
 }
 
-RefactoringStatus _validateIdentifier(String identifier, String desc,
-    String beginDesc) {
+RefactoringStatus _validateIdentifier(
+    String identifier, String desc, String beginDesc) {
   // has leading/trailing spaces
   String trimmed = identifier.trim();
   if (identifier != trimmed) {
@@ -167,6 +165,15 @@ RefactoringStatus _validateIdentifier(String identifier, String desc,
     String message = "$desc must not be empty.";
     return new RefactoringStatus.fatal(message);
   }
+  // keyword
+  {
+    Keyword keyword = Keyword.keywords[identifier];
+    if (keyword != null && !keyword.isPseudoKeyword) {
+      String message = "$desc must not be a keyword.";
+      return new RefactoringStatus.fatal(message);
+    }
+  }
+  // first character
   int currentChar = identifier.codeUnitAt(0);
   if (!isLetter(currentChar) &&
       currentChar != CHAR_UNDERSCORE &&
@@ -174,6 +181,7 @@ RefactoringStatus _validateIdentifier(String identifier, String desc,
     String message = "$desc must begin with $beginDesc.";
     return new RefactoringStatus.fatal(message);
   }
+  // other characters
   for (int i = 1; i < length; i++) {
     currentChar = identifier.codeUnitAt(i);
     if (!isLetterOrDigit(currentChar) &&
@@ -184,6 +192,7 @@ RefactoringStatus _validateIdentifier(String identifier, String desc,
       return new RefactoringStatus.fatal(message);
     }
   }
+  // OK
   return new RefactoringStatus();
 }
 
@@ -231,8 +240,8 @@ RefactoringStatus _validateUpperCamelCase(String identifier, String desc) {
     return new RefactoringStatus.fatal(message);
   }
   // is not identifier
-  RefactoringStatus status =
-      _validateIdentifier(identifier, desc, "an uppercase letter or underscore");
+  RefactoringStatus status = _validateIdentifier(
+      identifier, desc, "an uppercase letter or underscore");
   if (!status.isOK) {
     return status;
   }

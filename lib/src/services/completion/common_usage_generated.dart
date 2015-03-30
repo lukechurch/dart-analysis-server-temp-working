@@ -4,6 +4,8 @@
 
 part of services.completion.computer.dart.relevance;
 
+// Auto-generated, please do not edit.
+
 /**
  * A map of <library>.<classname> to an ordered list of method names,
  * field names, getter names, and named constructors.

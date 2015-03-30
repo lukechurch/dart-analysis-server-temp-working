@@ -8,8 +8,8 @@ import 'dart:async';
 import 'dart:collection';
 
 import 'package:analysis_server/src/protocol_server.dart' as protocol;
-import 'package:analysis_server/src/protocol_server.dart' hide Element,
-    ElementKind;
+import 'package:analysis_server/src/protocol_server.dart'
+    hide Element, ElementKind;
 import 'package:analysis_server/src/services/completion/dart_completion_manager.dart';
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/element.dart';
@@ -24,7 +24,6 @@ const String DYNAMIC = 'dynamic';
 CompletionSuggestion createSuggestion(Element element,
     {CompletionSuggestionKind kind: CompletionSuggestionKind.INVOCATION,
     int relevance: DART_RELEVANCE_DEFAULT}) {
-
   String nameForType(DartType type) {
     if (type == null) {
       return DYNAMIC;
@@ -56,14 +55,9 @@ CompletionSuggestion createSuggestion(Element element,
 
   String completion = element.displayName;
   bool isDeprecated = element.isDeprecated;
-  CompletionSuggestion suggestion = new CompletionSuggestion(
-      kind,
-      isDeprecated ? DART_RELEVANCE_LOW : relevance,
-      completion,
-      completion.length,
-      0,
-      isDeprecated,
-      false);
+  CompletionSuggestion suggestion = new CompletionSuggestion(kind,
+      isDeprecated ? DART_RELEVANCE_LOW : relevance, completion,
+      completion.length, 0, isDeprecated, false);
   suggestion.element = protocol.newElement_fromEngine(element);
   Element enclosingElement = element.enclosingElement;
   if (enclosingElement is ClassElement) {
@@ -71,15 +65,18 @@ CompletionSuggestion createSuggestion(Element element,
   }
   suggestion.returnType = returnType;
   if (element is ExecutableElement && element is! PropertyAccessorElement) {
-    suggestion.parameterNames = element.parameters.map(
-        (ParameterElement parameter) => parameter.name).toList();
-    suggestion.parameterTypes = element.parameters.map(
-        (ParameterElement parameter) => parameter.type.displayName).toList();
+    suggestion.parameterNames = element.parameters
+        .map((ParameterElement parameter) => parameter.name)
+        .toList();
+    suggestion.parameterTypes = element.parameters
+        .map((ParameterElement parameter) => parameter.type.displayName)
+        .toList();
     suggestion.requiredParameterCount = element.parameters.where(
         (ParameterElement parameter) =>
             parameter.parameterKind == ParameterKind.REQUIRED).length;
     suggestion.hasNamedParameters = element.parameters.any(
-        (ParameterElement parameter) => parameter.parameterKind == ParameterKind.NAMED);
+        (ParameterElement parameter) =>
+            parameter.parameterKind == ParameterKind.NAMED);
   }
   return suggestion;
 }
@@ -89,7 +86,6 @@ CompletionSuggestion createSuggestion(Element element,
  * that is defined in the given class.
  */
 visitInheritedTypeNames(ClassDeclaration node, void inherited(String name)) {
-
   void visit(TypeName type) {
     if (type != null) {
       Identifier id = type.name;
@@ -133,8 +129,8 @@ visitInheritedTypeNames(ClassDeclaration node, void inherited(String name)) {
  * For each class identifier in the hierarchy that is not defined locally,
  * call the [imported] function.
  */
-void visitInheritedTypes(ClassDeclaration node, void
-    local(ClassDeclaration classNode), void imported(String typeName)) {
+void visitInheritedTypes(ClassDeclaration node,
+    void local(ClassDeclaration classNode), void imported(String typeName)) {
   CompilationUnit unit = node.getAncestor((p) => p is CompilationUnit);
   List<ClassDeclaration> todo = new List<ClassDeclaration>();
   todo.add(node);
@@ -169,11 +165,6 @@ void visitInheritedTypes(ClassDeclaration node, void
 abstract class ElementSuggestionBuilder {
 
   /**
-   * Internal collection of completions to prevent duplicate completions.
-   */
-  final Set<String> _completions = new Set<String>();
-
-  /**
    * Return the kind of suggestions that should be built.
    */
   CompletionSuggestionKind get kind;
@@ -200,14 +191,13 @@ abstract class ElementSuggestionBuilder {
       }
     }
     String completion = element.displayName;
-    if (completion == null ||
-        completion.length <= 0 ||
-        !_completions.add(completion)) {
+    if (completion == null || completion.length <= 0) {
       return;
     }
-    CompletionSuggestion suggestion = createSuggestion(element, kind: kind, relevance: relevance);
+    CompletionSuggestion suggestion =
+        createSuggestion(element, kind: kind, relevance: relevance);
     if (suggestion != null) {
-      request.suggestions.add(suggestion);
+      request.addSuggestion(suggestion);
     }
   }
 }
@@ -272,8 +262,8 @@ class InterfaceTypeSuggestionBuilder {
       }
     }
     String identifier = element.displayName;
-    int alreadyGenerated =
-        _completionTypesGenerated.putIfAbsent(identifier, () => _COMPLETION_TYPE_NONE);
+    int alreadyGenerated = _completionTypesGenerated.putIfAbsent(
+        identifier, () => _COMPLETION_TYPE_NONE);
     if (element is MethodElement) {
       // Anything shadows a method.
       if (alreadyGenerated != _COMPLETION_TYPE_NONE) {
@@ -310,7 +300,7 @@ class InterfaceTypeSuggestionBuilder {
     }
     CompletionSuggestion suggestion = createSuggestion(element, kind: kind);
     if (suggestion != null) {
-      request.suggestions.add(suggestion);
+      request.addSuggestion(suggestion);
     }
   }
 
@@ -389,8 +379,8 @@ class InterfaceTypeSuggestionBuilder {
       type = request.cache.objectClassElement.type;
     }
     if (type is InterfaceType) {
-      return new InterfaceTypeSuggestionBuilder(
-          request)._buildSuggestions(type, library);
+      return new InterfaceTypeSuggestionBuilder(request)._buildSuggestions(
+          type, library);
     }
   }
 }
@@ -400,12 +390,13 @@ class InterfaceTypeSuggestionBuilder {
  * the visible members in that library. Clients should call
  * [LibraryElementSuggestionBuilder.suggestionsFor].
  */
-class LibraryElementSuggestionBuilder extends GeneralizingElementVisitor with
-    ElementSuggestionBuilder {
+class LibraryElementSuggestionBuilder extends GeneralizingElementVisitor
+    with ElementSuggestionBuilder {
   final DartCompletionRequest request;
   final CompletionSuggestionKind kind;
+  final bool typesOnly;
 
-  LibraryElementSuggestionBuilder(this.request, this.kind);
+  LibraryElementSuggestionBuilder(this.request, this.kind, this.typesOnly);
 
   @override
   visitClassElement(ClassElement element) {
@@ -424,7 +415,9 @@ class LibraryElementSuggestionBuilder extends GeneralizingElementVisitor with
 
   @override
   visitFunctionElement(FunctionElement element) {
-    addSuggestion(element);
+    if (!typesOnly) {
+      addSuggestion(element);
+    }
   }
 
   @override
@@ -434,16 +427,18 @@ class LibraryElementSuggestionBuilder extends GeneralizingElementVisitor with
 
   @override
   visitTopLevelVariableElement(TopLevelVariableElement element) {
-    addSuggestion(element);
+    if (!typesOnly) {
+      addSuggestion(element);
+    }
   }
 
   /**
    * Add suggestions for the visible members in the given library
    */
   static void suggestionsFor(DartCompletionRequest request,
-      CompletionSuggestionKind kind, LibraryElement library) {
+      CompletionSuggestionKind kind, LibraryElement library, bool typesOnly) {
     if (library != null) {
-      library.visitChildren(new LibraryElementSuggestionBuilder(request, kind));
+      library.visitChildren(new LibraryElementSuggestionBuilder(request, kind, typesOnly));
     }
   }
 }
@@ -452,8 +447,8 @@ class LibraryElementSuggestionBuilder extends GeneralizingElementVisitor with
  * This class visits elements in a class and provides suggestions based upon
  * the visible named constructors in that class.
  */
-class NamedConstructorSuggestionBuilder extends GeneralizingElementVisitor with
-    ElementSuggestionBuilder implements SuggestionBuilder {
+class NamedConstructorSuggestionBuilder extends GeneralizingElementVisitor
+    with ElementSuggestionBuilder implements SuggestionBuilder {
   final DartCompletionRequest request;
 
   NamedConstructorSuggestionBuilder(this.request);

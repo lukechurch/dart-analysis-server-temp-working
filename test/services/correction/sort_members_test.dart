@@ -11,12 +11,10 @@ import 'package:unittest/unittest.dart';
 import '../../abstract_single_unit.dart';
 import '../../reflective_tests.dart';
 
-
 main() {
   groupSep = ' | ';
   runReflectiveTests(SortMembersTest);
 }
-
 
 @reflectiveTest
 class SortMembersTest extends AbstractSingleUnitTest {
@@ -351,6 +349,37 @@ export 'bbb/bbb.dart';
 part 'aaa/aaa.dart';
 part 'bbb/bbb.dart';
 
+main() {
+}
+''');
+  }
+
+  void test_directives_comments() {
+    _parseTestUnit(r'''
+// header
+library lib;
+
+import 'c.dart';// c
+import 'a.dart';// aa
+import 'b.dart';// bbb
+
+/** doc */
+main() {
+}
+''');
+    // validate change
+    _assertSort(r'''
+// header
+library lib;
+
+import 'a.dart';
+import 'b.dart';
+import 'c.dart';
+// c
+// aa
+// bbb
+
+/** doc */
 main() {
 }
 ''');
