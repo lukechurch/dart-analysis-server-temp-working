@@ -3129,6 +3129,12 @@ dt.typeDefinition {
               which does not match a file currently subject to
               analysis.
             </p>
+          </dd><dt class="value">INVALID_ANALYSIS_ROOT</dt><dd>
+            
+            <p>
+              A path passed as an argument to a request (such as
+              analysis.reanalyze) is required to be an analysis root, but isn't.
+            </p>
           </dd><dt class="value">INVALID_EXECUTION_CONTEXT</dt><dd>
             
             <p>
@@ -3211,6 +3217,12 @@ dt.typeDefinition {
               A request was received which the analysis server does
               not recognize, or cannot handle in its current
               configuation.
+            </p>
+          </dd><dt class="value">UNKNOWN_SOURCE</dt><dd>
+            
+            <p>
+              The analysis server was requested to perform an action
+              on a source that does not exist.
             </p>
           </dd><dt class="value">UNSUPPORTED_FEATURE</dt><dd>
             

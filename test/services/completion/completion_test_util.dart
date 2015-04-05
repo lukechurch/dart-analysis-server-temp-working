@@ -11,6 +11,7 @@ import 'package:analysis_server/src/protocol.dart' as protocol
 import 'package:analysis_server/src/protocol.dart' hide Element, ElementKind;
 import 'package:analysis_server/src/services/completion/common_usage_computer.dart';
 import 'package:analysis_server/src/services/completion/completion_manager.dart';
+import 'package:analysis_server/src/services/completion/completion_target.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_cache.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_manager.dart';
 import 'package:analysis_server/src/services/completion/imported_computer.dart';
@@ -519,8 +520,8 @@ abstract class AbstractCompletionTest extends AbstractContextTest {
               context.getResolvedCompilationUnit(testSource, library);
           if (unit != null) {
             request.unit = unit;
-            request.node =
-                new NodeLocator.con1(completionOffset).searchWithin(unit);
+            request.target =
+                new CompletionTarget.forOffset(unit, completionOffset);
             resolved = true;
             if (!fullAnalysis) {
               break;
@@ -1385,7 +1386,7 @@ abstract class AbstractSelectorSuggestionTest extends AbstractCompletionTest {
     // Block  BlockFunctionBody  MethodDeclaration  ClassDeclaration
     addSource('/testB.dart', '''
       lib B;
-      class F { var f1; f2() { } get f3 => 0; set f4(fx) { } }
+      class F { var f1; f2() { } get f3 => 0; set f4(fx) { } var _pf; }
       class E extends F { var e1; e2() { } }
       class I { int i1; i2() { } }
       class M { var m1; int m2() { } }''');
@@ -1542,6 +1543,33 @@ abstract class AbstractSelectorSuggestionTest extends AbstractCompletionTest {
       // top level results are partially filtered
       //assertSuggestImportedClass('Object');
       assertNotSuggested('==');
+    });
+  }
+
+  test_CatchClause_onType() {
+    // TypeName  CatchClause  TryStatement
+    addTestSource('class A {a() {try{var x;} on ^ {}}}');
+    computeFast();
+    return computeFull((bool result) {
+      expect(request.replacementOffset, completionOffset);
+      expect(request.replacementLength, 0);
+      assertSuggestLocalClass('A');
+      assertSuggestImportedClass('Object');
+      assertNotSuggested('a');
+      assertNotSuggested('x');
+    });
+  }
+
+  test_CatchClause_onType_noBrackets() {
+    // TypeName  CatchClause  TryStatement
+    addTestSource('class A {a() {try{var x;} on ^}}');
+    computeFast();
+    return computeFull((bool result) {
+      expect(request.replacementOffset, completionOffset);
+      expect(request.replacementLength, 0);
+      assertSuggestLocalClass('A');
+      assertSuggestImportedClass('Object');
+      assertNotSuggested('x');
     });
   }
 
@@ -3467,6 +3495,26 @@ abstract class AbstractSelectorSuggestionTest extends AbstractCompletionTest {
       assertNotSuggested('a');
       assertNotSuggested('Object');
       assertNotSuggested('==');
+    });
+  }
+
+  test_PropertyAccess_noTarget() {
+    // SimpleIdentifier  PropertyAccess  ExpressionStatement
+    addSource('/testAB.dart', 'class Foo { }');
+    addTestSource('class C {foo(){.^}}');
+    computeFast();
+    return computeFull((bool result) {
+      assertNoSuggestions();
+    });
+  }
+
+  test_PropertyAccess_noTarget2() {
+    // SimpleIdentifier  PropertyAccess  ExpressionStatement
+    addSource('/testAB.dart', 'class Foo { }');
+    addTestSource('main() {.^}');
+    computeFast();
+    return computeFull((bool result) {
+      assertNoSuggestions();
     });
   }
 

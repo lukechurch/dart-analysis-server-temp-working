@@ -463,6 +463,14 @@ class AnalysisServer {
         return new ContextSourcePair(context, source);
       }
     }
+    // try to find a context for which the file is a priority source
+    for (InternalAnalysisContext context in folderMap.values) {
+      List<Source> sources = context.getSourcesWithFullName(path);
+      if (sources.isNotEmpty) {
+        Source source = sources.first;
+        return new ContextSourcePair(context, source);
+      }
+    }
     // file-based source
     Source fileSource = file != null ? file.createSource() : null;
     return new ContextSourcePair(null, fileSource);
@@ -733,14 +741,21 @@ class AnalysisServer {
   }
 
   /**
-   * Trigger reanalysis of all files from disk.
+   * Trigger reanalysis of all files in the given list of analysis [roots], or
+   * everything if the analysis roots is `null`.
    */
-  void reanalyze() {
+  void reanalyze(List<Resource> roots) {
     // Clear any operations that are pending.
-    operationQueue.clear();
+    if (roots == null) {
+      operationQueue.clear();
+    } else {
+      for (AnalysisContext context in _getContexts(roots)) {
+        operationQueue.contextRemoved(context);
+      }
+    }
     // Instruct the contextDirectoryManager to rebuild all contexts from
     // scratch.
-    contextDirectoryManager.refresh();
+    contextDirectoryManager.refresh(roots);
   }
 
   /**
@@ -916,10 +931,27 @@ class AnalysisServer {
         new HashMap<AnalysisContext, List<Source>>();
     List<String> unanalyzed = new List<String>();
     Source firstSource = null;
-    files.forEach((file) {
+    files.forEach((String file) {
       ContextSourcePair contextSource = getContextSourcePair(file);
       AnalysisContext preferredContext = contextSource.context;
       Source source = contextSource.source;
+      // Try to make the file analyzable.
+      // If it is not in any context yet, add it to the first one which
+      // could use it, e.g. imports its package, even if not the library.
+      if (preferredContext == null) {
+        Resource resource = resourceProvider.getResource(file);
+        if (resource is File && resource.exists) {
+          for (AnalysisContext context in folderMap.values) {
+            Uri uri = context.sourceFactory.restoreUri(source);
+            if (uri.scheme != 'file') {
+              preferredContext = context;
+              source = ContextManager.createSourceInContext(context, resource);
+              break;
+            }
+          }
+        }
+      }
+      // Fill the source map.
       bool contextFound = false;
       for (AnalysisContext context in folderMap.values) {
         if (context == preferredContext ||
@@ -1117,6 +1149,20 @@ class AnalysisServer {
     optionUpdaters.forEach((OptionUpdater optionUpdater) {
       optionUpdater(options);
     });
+  }
+
+  /**
+   * Return a set of contexts containing all of the resources in the given list
+   * of [resources].
+   */
+  Set<AnalysisContext> _getContexts(List<Resource> resources) {
+    Set<AnalysisContext> contexts = new HashSet<AnalysisContext>();
+    resources.forEach((Resource resource) {
+      if (resource is Folder) {
+        contexts.addAll(contextDirectoryManager.contextsInAnalysisRoot(resource));
+      }
+    });
+    return contexts;
   }
 
   /**

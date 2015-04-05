@@ -1821,6 +1821,7 @@ final Matcher isRequestError = new LazyMatcher(() => new MatchesJsonObject(
  *   CONTENT_MODIFIED
  *   FORMAT_INVALID_FILE
  *   GET_ERRORS_INVALID_FILE
+ *   INVALID_ANALYSIS_ROOT
  *   INVALID_EXECUTION_CONTEXT
  *   INVALID_OVERLAY_CHANGE
  *   INVALID_PARAMETER
@@ -1833,6 +1834,7 @@ final Matcher isRequestError = new LazyMatcher(() => new MatchesJsonObject(
  *   SORT_MEMBERS_PARSE_ERRORS
  *   UNANALYZED_PRIORITY_FILES
  *   UNKNOWN_REQUEST
+ *   UNKNOWN_SOURCE
  *   UNSUPPORTED_FEATURE
  * }
  */
@@ -1840,6 +1842,7 @@ final Matcher isRequestErrorCode = new MatchesEnum("RequestErrorCode", [
   "CONTENT_MODIFIED",
   "FORMAT_INVALID_FILE",
   "GET_ERRORS_INVALID_FILE",
+  "INVALID_ANALYSIS_ROOT",
   "INVALID_EXECUTION_CONTEXT",
   "INVALID_OVERLAY_CHANGE",
   "INVALID_PARAMETER",
@@ -1852,6 +1855,7 @@ final Matcher isRequestErrorCode = new MatchesEnum("RequestErrorCode", [
   "SORT_MEMBERS_PARSE_ERRORS",
   "UNANALYZED_PRIORITY_FILES",
   "UNKNOWN_REQUEST",
+  "UNKNOWN_SOURCE",
   "UNSUPPORTED_FEATURE"
 ]);
 

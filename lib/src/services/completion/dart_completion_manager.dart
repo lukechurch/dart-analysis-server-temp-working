@@ -18,6 +18,7 @@ import 'package:analysis_server/src/services/completion/invocation_computer.dart
 import 'package:analysis_server/src/services/completion/keyword_computer.dart';
 import 'package:analysis_server/src/services/completion/local_computer.dart';
 import 'package:analysis_server/src/services/completion/optype.dart';
+import 'package:analysis_server/src/services/completion/projective_computer.dart';
 import 'package:analysis_server/src/services/search/search_engine.dart';
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/engine.dart';
@@ -80,12 +81,13 @@ class DartCompletionManager extends CompletionManager {
       computers = [
         // LocalComputer before ImportedComputer
         // because local suggestions take precedence
+        new ProjectiveComputer(),
         new LocalComputer(),
         new ImportedComputer(),
         new KeywordComputer(),
         new ArgListComputer(),
         new CombinatorComputer(),
-        new InvocationComputer()
+        new InvocationComputer(),
       ];
     }
     if (commonUsageComputer == null) {
@@ -122,11 +124,10 @@ class DartCompletionManager extends CompletionManager {
     return request.performance.logElapseTime('computeFast', () {
       CompilationUnit unit = context.parseCompilationUnit(source);
       request.unit = unit;
-      request.node = new NodeLocator.con1(request.offset).searchWithin(unit);
       request.target = new CompletionTarget.forOffset(unit, request.offset);
       request.replacementOffset = request.offset;
       request.replacementLength = 0;
-      if (request.node == null) {
+      if (request.offset < 0 || request.offset > unit.end) {
         sendResults(request, true);
         return [];
       }
@@ -173,7 +174,6 @@ class DartCompletionManager extends CompletionManager {
       }
       request.performance.logElapseTime('computeFull', () {
         request.unit = unit;
-        request.node = new NodeLocator.con1(request.offset).searchWithin(unit);
         // TODO(paulberry): Do we need to invoke _ReplacementOffsetBuilder
         // again?
         request.target = new CompletionTarget.forOffset(unit, request.offset);
@@ -279,18 +279,8 @@ class DartCompletionRequest extends CompletionRequest {
   CompilationUnit unit;
 
   /**
-   * The node in which the completion occurred. This node
-   * may or may not be resolved when [DartCompletionComputer.computeFast]
-   * is called but is resolved when [DartCompletionComputer.computeFull].
-   */
-  AstNode node;
-
-  /**
    * The completion target.  This determines what part of the parse tree
    * will receive the newly inserted text.
-   *
-   * TODO(paulberry) gradually transition code over to using this rather than
-   * [node].
    */
   CompletionTarget target;
 

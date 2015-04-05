@@ -251,6 +251,18 @@ class OpTypeTest {
     assertOpType(returnValue: true, typeNames: true, voidReturn: true);
   }
 
+  test_CatchClause_onType() {
+    // TypeName  CatchClause  TryStatement
+    addTestSource('class A {a() {try{var x;} on ^ {}}}');
+    assertOpType(typeNames: true);
+  }
+
+  test_CatchClause_onType_noBrackets() {
+    // TypeName  CatchClause  TryStatement
+    addTestSource('class A {a() {try{var x;} on ^}}');
+    assertOpType(typeNames: true);
+  }
+
   test_CatchClause_typed() {
     // Block  CatchClause  TryStatement
     addTestSource('class A {a() {try{var x;} on E catch (e) {^}}}');
@@ -1040,6 +1052,24 @@ class C2 {
     // SimpleIdentifier  MethodInvocation  PropertyAccess  ExpressionStatement
     addTestSource('class A {a() {"hello".to^String().length}}');
     assertOpType(invocation: true);
+  }
+
+  test_PropertyAccess_noTarget() {
+    // SimpleIdentifier  PropertyAccess  ExpressionStatement
+    addTestSource('main() {.^}');
+    assertOpType();
+  }
+
+  test_PropertyAccess_noTarget2() {
+    // SimpleIdentifier  PropertyAccess  CascadeExpressions
+    addTestSource('main() {.^.}');
+    assertOpType();
+  }
+
+  test_PropertyAccess_noTarget3() {
+    // SimpleIdentifier  PropertyAccess  CascadeExpressions
+    addTestSource('main() {..^}');
+    assertOpType();
   }
 
   test_PropertyAccess_selector() {

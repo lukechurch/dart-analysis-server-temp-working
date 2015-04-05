@@ -166,6 +166,13 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
   }
 
   @override
+  void visitCatchClause(CatchClause node) {
+    if (identical(entity, node.exceptionType)) {
+      optype.includeTypeNameSuggestions = true;
+    }
+  }
+
+  @override
   void visitClassDeclaration(ClassDeclaration node) {
     // Make suggestions in the body of the class declaration
     if (node.members.contains(entity) || identical(entity, node.rightBracket)) {
@@ -459,6 +466,11 @@ class _OpTypeAstVisitor extends GeneralizingAstVisitor {
 
   @override
   void visitPropertyAccess(PropertyAccess node) {
+    if (node.realTarget is SimpleIdentifier && node.realTarget.isSynthetic) {
+      // If the access has no target (empty string)
+      // then don't suggest anything
+      return;
+    }
     if (identical(entity, node.operator) && offset > node.operator.offset) {
       // The cursor is between the two dots of a ".." token, so we need to
       // generate the completions we would generate after a "." token.
