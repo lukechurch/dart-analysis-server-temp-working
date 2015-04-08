@@ -38,9 +38,14 @@ main() {
     ExecutionDomainHandler handler;
 
     setUp(() {
-      server = new AnalysisServer(new MockServerChannel(), provider,
-          new MockPackageMapProvider(), null, new AnalysisServerOptions(),
-          new MockSdk(), InstrumentationService.NULL_SERVICE);
+      server = new AnalysisServer(
+          new MockServerChannel(),
+          provider,
+          new MockPackageMapProvider(),
+          null,
+          new AnalysisServerOptions(),
+          new MockSdk(),
+          InstrumentationService.NULL_SERVICE);
       handler = new ExecutionDomainHandler(server);
     });
 
@@ -112,8 +117,8 @@ main() {
 
       group('file to URI', () {
         test('does not exist', () {
-          Request request = new ExecutionMapUriParams(contextId,
-              file: '/a/c.dart').toRequest('2');
+          Request request =
+              new ExecutionMapUriParams(contextId, file: '/a/c.dart').toRequest('2');
           Response response = handler.handleRequest(request);
           expect(response, isResponseFailure('2'));
         });
@@ -127,8 +132,8 @@ main() {
         });
 
         test('valid', () {
-          Request request = new ExecutionMapUriParams(contextId,
-              file: '/a/b.dart').toRequest('2');
+          Request request =
+              new ExecutionMapUriParams(contextId, file: '/a/b.dart').toRequest('2');
           Response response = handler.handleRequest(request);
           expect(response, isResponseSuccess('2'));
           ExecutionMapUriResult result =
@@ -140,15 +145,15 @@ main() {
 
       group('URI to file', () {
         test('invalid', () {
-          Request request = new ExecutionMapUriParams(contextId,
-              uri: 'foo:///a/b.dart').toRequest('2');
+          Request request =
+              new ExecutionMapUriParams(contextId, uri: 'foo:///a/b.dart').toRequest('2');
           Response response = handler.handleRequest(request);
           expect(response, isResponseFailure('2'));
         });
 
         test('valid', () {
-          Request request = new ExecutionMapUriParams(contextId,
-              uri: 'file:///a/b.dart').toRequest('2');
+          Request request =
+              new ExecutionMapUriParams(contextId, uri: 'file:///a/b.dart').toRequest('2');
           Response response = handler.handleRequest(request);
           expect(response, isResponseSuccess('2'));
           ExecutionMapUriResult result =
@@ -194,9 +199,8 @@ main() {
       test('success - setting and clearing', () {
         expect(handler.onFileAnalyzed, isNull);
 
-        Request request =
-            new ExecutionSetSubscriptionsParams([ExecutionService.LAUNCH_DATA])
-                .toRequest('0');
+        Request request = new ExecutionSetSubscriptionsParams(
+            [ExecutionService.LAUNCH_DATA]).toRequest('0');
         Response response = handler.handleRequest(request);
         expect(response, isResponseSuccess('0'));
         expect(handler.onFileAnalyzed, isNotNull);
@@ -218,14 +222,15 @@ main() {
       Source source7 = new TestSource('/g.html');
 
       AnalysisContext context = new AnalysisContextMock();
-      when(context.launchableClientLibrarySources)
-          .thenReturn([source1, source2]);
-      when(context.launchableServerLibrarySources)
-          .thenReturn([source2, source3]);
+      when(
+          context.launchableClientLibrarySources).thenReturn([source1, source2]);
+      when(
+          context.launchableServerLibrarySources).thenReturn([source2, source3]);
       when(context.librarySources).thenReturn([source4]);
       when(context.htmlSources).thenReturn([source5]);
-      when(context.getLibrariesReferencedFromHtml(anyObject))
-          .thenReturn([source6, source7]);
+      when(
+          context.getLibrariesReferencedFromHtml(
+              anyObject)).thenReturn([source6, source7]);
 
       ServerContextManager manager = new ServerContextManagerMock();
       when(manager.isInAnalysisRoot(anyString)).thenReturn(true);
@@ -238,14 +243,13 @@ main() {
       when(server.onFileAnalyzed).thenReturn(controller.stream);
 
       List<String> unsentNotifications = <String>[
-        source1.fullName,
-        source2.fullName,
-        source3.fullName,
-        source4.fullName,
-        source5.fullName
-      ];
-      when(server.sendNotification(anyObject)).thenInvoke(
-          (Notification notification) {
+          source1.fullName,
+          source2.fullName,
+          source3.fullName,
+          source4.fullName,
+          source5.fullName];
+      when(
+          server.sendNotification(anyObject)).thenInvoke((Notification notification) {
         ExecutionLaunchDataParams params =
             new ExecutionLaunchDataParams.fromNotification(notification);
 
@@ -270,9 +274,8 @@ main() {
       });
 
       ExecutionDomainHandler handler = new ExecutionDomainHandler(server);
-      Request request =
-          new ExecutionSetSubscriptionsParams([ExecutionService.LAUNCH_DATA])
-              .toRequest('0');
+      Request request = new ExecutionSetSubscriptionsParams(
+          [ExecutionService.LAUNCH_DATA]).toRequest('0');
       handler.handleRequest(request);
 
 //      controller.add(null);

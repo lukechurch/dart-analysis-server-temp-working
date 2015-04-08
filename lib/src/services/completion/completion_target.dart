@@ -1,23 +1,5 @@
 import 'package:analyzer/src/generated/ast.dart';
-import 'package:analyzer/src/generated/element.dart';
 import 'package:analyzer/src/generated/scanner.dart';
-import 'package:analyzer/src/generated/utilities_dart.dart';
-
-int _computeArgIndex(AstNode containingNode, Object entity) {
-  var argList = containingNode;
-  if (argList is ArgumentList) {
-    NodeList<Expression> args = argList.arguments;
-    for (int index = 0; index < args.length; ++index) {
-      if (entity == args[index]) {
-        return index;
-      }
-    }
-    if (args.isEmpty) {
-      return 0;
-    }
-  }
-  return null;
-}
 
 /**
  * A CompletionTarget represents an edge in the parse tree which connects an
@@ -97,17 +79,11 @@ class CompletionTarget {
   final Object entity;
 
   /**
-   * If the target is an argument in an [ArgumentList], then this is the index
-   * of the argument in the list, otherwise this is `null`.
-   */
-  final int argIndex;
-
-  /**
    * Compute the appropriate [CompletionTarget] for the given [offset] within
    * the [compilationUnit].
    */
-  factory CompletionTarget.forOffset(
-      CompilationUnit compilationUnit, int offset) {
+  factory CompletionTarget.forOffset(CompilationUnit compilationUnit,
+      int offset) {
     // The precise algorithm is as follows.  We perform a depth-first search of
     // all edges in the parse tree (both those that point to AST nodes and
     // those that point to tokens), visiting parents before children.  The
@@ -156,18 +132,6 @@ class CompletionTarget {
 
           // If the node is a candidate target, then we are done.
           if (_isCandidateNode(entity, offset)) {
-            // Check to see if the offset is in a preceeding comment
-            Token commentToken = _getContainingCommentToken(entity, offset);
-            if (commentToken != null) {
-              entity = commentToken;
-              // If the preceeding comment is dartdoc token then update
-              // the containing node to be the dartdoc comment
-              Comment docComment =
-                  _getContainingDocComment(containingNode, commentToken);
-              if (docComment != null) {
-                containingNode = docComment;
-              }
-            }
             return new CompletionTarget._(containingNode, entity);
           }
 
@@ -200,90 +164,7 @@ class CompletionTarget {
    * Create a [CompletionTarget] holding the given [containingNode] and
    * [entity].
    */
-  CompletionTarget._(AstNode containingNode, Object entity)
-      : this.containingNode = containingNode,
-        this.entity = entity,
-        this.argIndex = _computeArgIndex(containingNode, entity);
-
-  /**
-   * Return `true` if the target is a functional argument in an argument list.
-   * The target [AstNode] hierarchy *must* be resolved for this to work.
-   */
-  bool isFunctionalArgument() {
-    if (argIndex == null) {
-      return false;
-    }
-    AstNode argList = containingNode;
-    if (argList is! ArgumentList) {
-      return false;
-    }
-    AstNode parent = argList.parent;
-    if (parent is InstanceCreationExpression) {
-      DartType instType = parent.bestType;
-      if (instType != null) {
-        Element intTypeElem = instType.element;
-        if (intTypeElem is ClassElement) {
-          SimpleIdentifier constructorName = parent.constructorName.name;
-          ConstructorElement constructor = constructorName != null
-              ? intTypeElem.getNamedConstructor(constructorName.name)
-              : intTypeElem.unnamedConstructor;
-          return constructor != null &&
-              _isFunctionalParameter(constructor.parameters, argIndex);
-        }
-      }
-    } else if (parent is MethodInvocation) {
-      SimpleIdentifier methodName = parent.methodName;
-      if (methodName != null) {
-        Element methodElem = methodName.bestElement;
-        if (methodElem is MethodElement) {
-          return _isFunctionalParameter(methodElem.parameters, argIndex);
-        } else if (methodElem is FunctionElement) {
-          return _isFunctionalParameter(methodElem.parameters, argIndex);
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Determine if the offset is contained in a preceeding comment token
-   * and return that token, otherwise return `null`.
-   */
-  static Token _getContainingCommentToken(AstNode node, int offset) {
-    if (offset >= node.offset) {
-      return null;
-    }
-    Token token = node.beginToken;
-    if (token == null) {
-      return null;
-    }
-    token = token.precedingComments;
-    while (token != null) {
-      if (offset <= token.offset) {
-        return null;
-      }
-      if (offset <= token.end) {
-        if (token.type == TokenType.SINGLE_LINE_COMMENT || offset < token.end) {
-          return token;
-        }
-      }
-      token = token.next;
-    }
-    return null;
-  }
-
-  /**
-   * Determine if the given token is part of the given node's dart doc.
-   */
-  static Comment _getContainingDocComment(AstNode node, Token token) {
-    if (node is AnnotatedNode) {
-      Comment docComment = node.documentationComment;
-      if (docComment != null && docComment.tokens.contains(token)) {
-        return docComment;
-      }
-    }
-    return null;
-  }
+  CompletionTarget._(this.containingNode, this.entity);
 
   /**
    * Determine whether [node] could possibly be the [entity] for a
@@ -323,23 +204,5 @@ class CompletionTarget {
     } else {
       return false;
     }
-  }
-
-  /**
-   * Return `true` if the parameter is a functional parameter.
-   */
-  static bool _isFunctionalParameter(
-      List<ParameterElement> parameters, int paramIndex) {
-    if (paramIndex < parameters.length) {
-      ParameterElement param = parameters[paramIndex];
-      DartType paramType = param.type;
-      if (param.parameterKind == ParameterKind.NAMED) {
-        // TODO(danrubel) handle named parameters
-        return false;
-      } else {
-        return paramType is FunctionType || paramType is FunctionTypeAlias;
-      }
-    }
-    return false;
   }
 }

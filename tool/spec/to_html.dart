@@ -99,38 +99,49 @@ class ApiMappings extends HierarchicalApiVisitor {
  */
 abstract class HtmlMixin {
   void anchor(String id, void callback()) {
-    element('a', {'name': id}, callback);
+    element('a', {
+      'name': id
+    }, callback);
   }
 
   void b(void callback()) => element('b', {}, callback);
   void body(void callback()) => element('body', {}, callback);
   void box(void callback()) {
-    element('div', {'class': 'box'}, callback);
+    element('div', {
+      'class': 'box'
+    }, callback);
   }
   void br() => element('br', {});
   void dd(void callback()) => element('dd', {}, callback);
   void dl(void callback()) => element('dl', {}, callback);
-  void dt(String cls, void callback()) =>
-      element('dt', {'class': cls}, callback);
+  void dt(String cls, void callback()) => element('dt', {
+    'class': cls
+  }, callback);
   void element(String name, Map<dynamic, String> attributes, [void callback()]);
-  void gray(void callback()) =>
-      element('span', {'style': 'color:#999999'}, callback);
+  void gray(void callback()) => element('span', {
+    'style': 'color:#999999'
+  }, callback);
   void h1(void callback()) => element('h1', {}, callback);
   void h2(String cls, void callback()) {
     if (cls == null) {
       return element('h2', {}, callback);
     }
-    return element('h2', {'class': cls}, callback);
+    return element('h2', {
+      'class': cls
+    }, callback);
   }
   void h3(void callback()) => element('h3', {}, callback);
   void h4(void callback()) => element('h4', {}, callback);
-  void hangingIndent(void callback()) =>
-      element('div', {'class': 'hangingIndent'}, callback);
+  void hangingIndent(void callback()) => element('div', {
+    'class': 'hangingIndent'
+  }, callback);
   void head(void callback()) => element('head', {}, callback);
   void html(void callback()) => element('html', {}, callback);
   void i(void callback()) => element('i', {}, callback);
   void link(String id, void callback()) {
-    element('a', {'href': '#$id'}, callback);
+    element('a', {
+      'href': '#$id'
+    }, callback);
   }
   void p(void callback()) => element('p', {}, callback);
   void pre(void callback()) => element('pre', {}, callback);
@@ -141,8 +152,8 @@ abstract class HtmlMixin {
 /**
  * Visitor that generates HTML documentation of the API.
  */
-class ToHtmlVisitor extends HierarchicalApiVisitor
-    with HtmlMixin, HtmlGenerator {
+class ToHtmlVisitor extends HierarchicalApiVisitor with HtmlMixin, HtmlGenerator
+    {
   /**
    * Set of types defined in the API.
    */
@@ -307,19 +318,14 @@ class ToHtmlVisitor extends HierarchicalApiVisitor
   @override
   void visitNotification(Notification notification) {
     dt('notification', () {
-      anchor('notification_${notification.longEvent}', () {
-        write(notification.longEvent);
-      });
-      write(' (');
-      link('notification_${notification.longEvent}', () {
-        write('#');
-      });
-      write(')');
+      write(notification.longEvent);
     });
     dd(() {
       box(() {
         showType(
-            'notification', notification.notificationType, notification.params);
+            'notification',
+            notification.notificationType,
+            notification.params);
       });
       translateHtml(notification.html);
       describePayload(notification.params, 'Parameters');
@@ -348,14 +354,7 @@ class ToHtmlVisitor extends HierarchicalApiVisitor
   @override
   void visitRequest(Request request) {
     dt('request', () {
-      anchor('request_${request.longMethod}', () {
-        write(request.longMethod);
-      });
-      write(' (');
-      link('request_${request.longMethod}', () {
-        write('#');
-      });
-      write(')');
+      write(request.longMethod);
     });
     dd(() {
       box(() {
@@ -461,7 +460,8 @@ class ToHtmlVisitor extends HierarchicalApiVisitor
   }
 
   @override
-  void visitTypeReference(TypeReference typeReference) {}
+  void visitTypeReference(TypeReference typeReference) {
+  }
 
   @override
   void visitTypes(Types types) {
@@ -483,8 +483,8 @@ class ToHtmlVisitor extends HierarchicalApiVisitor
  *   }
  * }
  */
-class TypeVisitor extends HierarchicalApiVisitor
-    with HtmlMixin, HtmlCodeGenerator {
+class TypeVisitor extends HierarchicalApiVisitor with HtmlMixin,
+    HtmlCodeGenerator {
   /**
    * Set of fields which should be shown in boldface, or null if no field
    * should be shown in boldface.

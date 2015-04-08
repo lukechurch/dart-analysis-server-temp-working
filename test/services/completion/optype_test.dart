@@ -21,6 +21,7 @@ main() {
 
 @reflectiveTest
 class OpTypeTest {
+
   OpType visitor;
 
   void addTestSource(String content, {bool resolved: false}) {
@@ -34,9 +35,9 @@ class OpTypeTest {
     context.sourceFactory =
         new SourceFactory([AbstractContextTest.SDK_RESOLVER]);
     context.setContents(source, content);
-    CompilationUnit unit = resolved
-        ? context.resolveCompilationUnit2(source, source)
-        : context.parseCompilationUnit(source);
+    CompilationUnit unit = resolved ?
+        context.resolveCompilationUnit2(source, source) :
+        context.parseCompilationUnit(source);
     CompletionTarget completionTarget =
         new CompletionTarget.forOffset(unit, offset);
     visitor = new OpType.forCompletion(completionTarget, offset);
@@ -44,21 +45,31 @@ class OpTypeTest {
 
   void assertOpType({bool invocation: false, bool returnValue: false,
       bool typeNames: false, bool voidReturn: false, bool statementLabel: false,
-      bool caseLabel: false, bool constructors: false}) {
-    expect(visitor.includeInvocationSuggestions, equals(invocation),
+      bool caseLabel: false}) {
+    expect(
+        visitor.includeInvocationSuggestions,
+        equals(invocation),
         reason: 'invocation');
-    expect(visitor.includeReturnValueSuggestions, equals(returnValue),
+    expect(
+        visitor.includeReturnValueSuggestions,
+        equals(returnValue),
         reason: 'returnValue');
-    expect(visitor.includeTypeNameSuggestions, equals(typeNames),
+    expect(
+        visitor.includeTypeNameSuggestions,
+        equals(typeNames),
         reason: 'typeNames');
-    expect(visitor.includeVoidReturnSuggestions, equals(voidReturn),
+    expect(
+        visitor.includeVoidReturnSuggestions,
+        equals(voidReturn),
         reason: 'voidReturn');
-    expect(visitor.includeStatementLabelSuggestions, equals(statementLabel),
+    expect(
+        visitor.includeStatementLabelSuggestions,
+        equals(statementLabel),
         reason: 'statementLabel');
-    expect(visitor.includeCaseLabelSuggestions, equals(caseLabel),
+    expect(
+        visitor.includeCaseLabelSuggestions,
+        equals(caseLabel),
         reason: 'caseLabel');
-    expect(visitor.includeConstructorSuggestions, equals(constructors),
-        reason: 'constructors');
   }
 
   test_Annotation() {
@@ -175,12 +186,6 @@ class OpTypeTest {
     // SimpleIdentifier  BinaryExpression  VariableDeclaration
     // VariableDeclarationList  VariableDeclarationStatement
     addTestSource('main() {int a = 1, b = 2 + ^;}');
-    assertOpType(returnValue: true, typeNames: true);
-  }
-
-  test_BinaryExpression_RHS2() {
-    // SimpleIdentifier  BinaryExpression
-    addTestSource('main() {if (c < ^)}');
     assertOpType(returnValue: true, typeNames: true);
   }
 
@@ -339,7 +344,7 @@ class OpTypeTest {
     // SimpleIdentifier  PrefixedIdentifier  TypeName  ConstructorName
     // InstanceCreationExpression
     addTestSource('main() {new Str^ing.fromCharCodes([]);}', resolved: true);
-    assertOpType(constructors: true);
+    assertOpType(typeNames: true);
   }
 
   test_ConstructorName_resolved() {
@@ -475,28 +480,10 @@ class OpTypeTest {
     assertOpType(typeNames: true);
   }
 
-  test_FormalParameter_partialType() {
-    // FormalParameterList MethodDeclaration
-    addTestSource('class A {a(b.^ f) { }}');
-    assertOpType(invocation: true);
-  }
-
-  test_FormalParameter_partialType2() {
-    // FormalParameterList MethodDeclaration
-    addTestSource('class A {a(b.z^ f) { }}');
-    assertOpType(invocation: true);
-  }
-
-  test_FormalParameter_partialType3() {
-    // FormalParameterList MethodDeclaration
-    addTestSource('class A {a(b.^) { }}');
-    assertOpType(invocation: true);
-  }
-
   test_FormalParameterList() {
     // FormalParameterList MethodDeclaration
     addTestSource('class A {a(^) { }}');
-    assertOpType(typeNames: true);
+    assertOpType(returnValue: true, typeNames: true);
   }
 
   test_ForStatement_condition() {
@@ -524,167 +511,6 @@ class OpTypeTest {
     // SimpleIdentifier  PrefixExpression  ForStatement
     addTestSource('main() {for (int index = 0; index < 10; ++i^)}');
     assertOpType(returnValue: true, typeNames: true);
-  }
-
-  test_FunctionDeclaration1() {
-    // SimpleIdentifier  FunctionDeclaration  CompilationUnit
-    addTestSource('const ^Fara();');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration2() {
-    // SimpleIdentifier  FunctionDeclaration  CompilationUnit
-    addTestSource('const F^ara();');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_inLineComment() {
-    // Comment  CompilationUnit
-    addTestSource('''
-      // normal comment ^
-      zoo(z) { } String name;''');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inLineComment2() {
-    // Comment  CompilationUnit
-    addTestSource('''
-      // normal ^comment
-      zoo(z) { } String name;''');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inLineComment3() {
-    // Comment  CompilationUnit
-    addTestSource('''
-      // normal comment ^
-      // normal comment 2
-      zoo(z) { } String name;''');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inLineComment4() {
-    // Comment  CompilationUnit
-    addTestSource('''
-      // normal comment 
-      // normal comment 2^
-      zoo(z) { } String name;''');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inLineDocComment() {
-    // Comment  FunctionDeclaration  CompilationUnit
-    addTestSource('''
-      /// some dartdoc ^
-      zoo(z) { } String name;''');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inLineDocComment2() {
-    // Comment  FunctionDeclaration  CompilationUnit
-    addTestSource('''
-      /// some ^dartdoc
-      zoo(z) { } String name;''');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inStarComment() {
-    // Comment  CompilationUnit
-    addTestSource('/* ^ */ zoo(z) {} String name;');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inStarComment2() {
-    // Comment  CompilationUnit
-    addTestSource('/*  *^/ zoo(z) {} String name;');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inStarDocComment() {
-    // Comment  FunctionDeclaration  CompilationUnit
-    addTestSource('/** ^ */ zoo(z) { } String name; ');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_inStarDocComment2() {
-    // Comment  FunctionDeclaration  CompilationUnit
-    addTestSource('/**  *^/ zoo(z) { } String name;');
-    assertOpType();
-  }
-
-  test_FunctionDeclaration_returnType() {
-    // CompilationUnit
-    addTestSource('^ zoo(z) { } String name;');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterLineComment() {
-    // FunctionDeclaration  CompilationUnit
-    addTestSource('''
-      // normal comment
-      ^ zoo(z) {} String name;''');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterLineComment2() {
-    // FunctionDeclaration  CompilationUnit
-    // TOD(danrubel) left align all test source
-    addTestSource('''
-// normal comment
-^ zoo(z) {} String name;''');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterLineDocComment() {
-    // SimpleIdentifier  FunctionDeclaration  CompilationUnit
-    addTestSource('''
-      /// some dartdoc
-      ^ zoo(z) { } String name;''');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterLineDocComment2() {
-    // SimpleIdentifier  FunctionDeclaration  CompilationUnit
-    addTestSource('''
-/// some dartdoc
-^ zoo(z) { } String name;''');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterStarComment() {
-    // CompilationUnit
-    addTestSource('/* */ ^ zoo(z) { } String name;');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterStarComment2() {
-    // CompilationUnit
-    addTestSource('/* */^ zoo(z) { } String name;');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterStarDocComment() {
-    // FunctionDeclaration  CompilationUnit
-    addTestSource('/** */ ^ zoo(z) { } String name;');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionDeclaration_returnType_afterStarDocComment2() {
-    // FunctionDeclaration  CompilationUnit
-    addTestSource('/** */^ zoo(z) { } String name;');
-    assertOpType(typeNames: true);
-  }
-
-  test_FunctionExpression() {
-    // BlockFunctionBody  FunctionExpression  FunctionDeclaration
-    addTestSource('main()^ { int b = 2; b++; b. }');
-    assertOpType();
-  }
-
-  test_FunctionExpressionInvocation() {
-    // ArgumentList  FunctionExpressionInvocation  ExpressionStatement
-    addTestSource('main() { ((x) => x + 7)^(2) }');
-    assertOpType();
   }
 
   test_FunctionTypeAlias() {
@@ -741,10 +567,10 @@ class OpTypeTest {
     assertOpType(returnValue: true, typeNames: true);
   }
 
-  test_InstanceCreationExpression() {
+  test_InstanceCreationExpression_imported() {
     // SimpleIdentifier  TypeName  ConstructorName  InstanceCreationExpression
     addTestSource('class C {foo(){var f; {var x;} new ^}}');
-    assertOpType(constructors: true);
+    assertOpType(typeNames: true);
   }
 
   test_InstanceCreationExpression_keyword() {
@@ -759,16 +585,10 @@ class OpTypeTest {
     assertOpType(returnValue: true, typeNames: true, voidReturn: true);
   }
 
-  test_InstanceCreationExpression_trailingStmt() {
-    // SimpleIdentifier  TypeName  ConstructorName  InstanceCreationExpression
-    addTestSource('class C {foo(){var f; {var x;} new ^ int x = 7;}}');
-    assertOpType(constructors: true);
-  }
-
   test_InterpolationExpression() {
     // SimpleIdentifier  InterpolationExpression  StringInterpolation
     addTestSource('main() {String name; print("hello \$^");}');
-    assertOpType(returnValue: true);
+    assertOpType(returnValue: true, typeNames: true);
   }
 
   test_InterpolationExpression_block() {
@@ -825,24 +645,6 @@ class OpTypeTest {
     assertOpType();
   }
 
-  test_MapLiteralEntry() {
-    // MapLiteralEntry  MapLiteral  VariableDeclaration
-    addTestSource('foo = {^');
-    assertOpType(returnValue: true, typeNames: true);
-  }
-
-  test_MapLiteralEntry1() {
-    // MapLiteralEntry  MapLiteral  VariableDeclaration
-    addTestSource('foo = {T^');
-    assertOpType(returnValue: true, typeNames: true);
-  }
-
-  test_MapLiteralEntry2() {
-    // SimpleIdentifier  MapLiteralEntry  MapLiteral  VariableDeclaration
-    addTestSource('foo = {7:T^};');
-    assertOpType(returnValue: true, typeNames: true);
-  }
-
   test_MethodDeclaration1() {
     // SimpleIdentifier  MethodDeclaration  ClassDeclaration
     addTestSource('class Bar {const ^Fara();}');
@@ -855,153 +657,6 @@ class OpTypeTest {
     assertOpType(typeNames: true);
   }
 
-  test_MethodDeclaration_inLineComment() {
-    // Comment  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        // normal comment ^
-        zoo(z) { } String name; }''');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inLineComment2() {
-    // Comment  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        // normal ^comment
-        zoo(z) { } String name; }''');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inLineComment3() {
-    // Comment  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        // normal comment ^
-        // normal comment 2
-        zoo(z) { } String name; }''');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inLineComment4() {
-    // Comment  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        // normal comment 
-        // normal comment 2^
-        zoo(z) { } String name; }''');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inLineDocComment() {
-    // Comment  MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        /// some dartdoc ^
-        zoo(z) { } String name; }''');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inLineDocComment2() {
-    // Comment  MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        /// some ^dartdoc
-        zoo(z) { } String name; }''');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inStarComment() {
-    // Comment  ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/* ^ */ zoo(z) {} String name;}');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inStarComment2() {
-    // Comment  ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/*  *^/ zoo(z) {} String name;}');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inStarDocComment() {
-    // Comment  MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/** ^ */ zoo(z) { } String name; }');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_inStarDocComment2() {
-    // Comment  MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/**  *^/ zoo(z) { } String name; }');
-    assertOpType();
-  }
-
-  test_MethodDeclaration_returnType() {
-    // ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {^ zoo(z) { } String name; }');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterLineComment() {
-    // MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        // normal comment
-        ^ zoo(z) {} String name;}''');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterLineComment2() {
-    // MethodDeclaration  ClassDeclaration  CompilationUnit
-    // TOD(danrubel) left align all test source
-    addTestSource('''
-class C2 {
-  // normal comment
-^ zoo(z) {} String name;}''');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterLineDocComment() {
-    // SimpleIdentifier  MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('''
-      class C2 {
-        /// some dartdoc
-        ^ zoo(z) { } String name; }''');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterLineDocComment2() {
-    // SimpleIdentifier  MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('''
-class C2 {
-  /// some dartdoc
-^ zoo(z) { } String name; }''');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterStarComment() {
-    // ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/* */ ^ zoo(z) { } String name; }');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterStarComment2() {
-    // ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/* */^ zoo(z) { } String name; }');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterStarDocComment() {
-    // MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/** */ ^ zoo(z) { } String name; }');
-    assertOpType(typeNames: true);
-  }
-
-  test_MethodDeclaration_returnType_afterStarDocComment2() {
-    // MethodDeclaration  ClassDeclaration  CompilationUnit
-    addTestSource('class C2 {/** */^ zoo(z) { } String name; }');
-    assertOpType(typeNames: true);
-  }
-
   test_MethodInvocation_no_semicolon() {
     // MethodInvocation  ExpressionStatement  Block
     addTestSource('''
@@ -1010,12 +665,6 @@ class C2 {
         set _s2(I x) {x.^ m(null);}
       }''');
     assertOpType(invocation: true);
-  }
-
-  test_PostfixExpression() {
-    // SimpleIdentifier  PostfixExpression  ForStatement
-    addTestSource('int x = 0; main() {ax+^+;}');
-    assertOpType(returnValue: true, typeNames: true);
   }
 
   test_PrefixedIdentifier_class_const() {
@@ -1057,7 +706,7 @@ class C2 {
   test_SimpleFormalParameter() {
     // SimpleIdentifier  SimpleFormalParameter  FormalParameterList
     addTestSource('mth() { PNGS.sort((String a, Str^) => a.compareTo(b)); }');
-    assertOpType(typeNames: true);
+    assertOpType(returnValue: true, typeNames: true);
   }
 
   test_SwitchCase() {
@@ -1092,12 +741,6 @@ class C2 {
     assertOpType(invocation: true);
   }
 
-  test_ThrowExpression() {
-    // SimpleIdentifier  ThrowExpression  ExpressionStatement
-    addTestSource('main() {throw ^;}');
-    assertOpType(returnValue: true, typeNames: true);
-  }
-
   test_TopLevelVariableDeclaration_typed_name() {
     // SimpleIdentifier  VariableDeclaration  VariableDeclarationList
     // TopLevelVariableDeclaration
@@ -1110,18 +753,6 @@ class C2 {
     // TopLevelVariableDeclaration
     addTestSource('class A {} var ^');
     assertOpType();
-  }
-
-  test_TypeArgumentList() {
-    // SimpleIdentifier  BinaryExpression  ExpressionStatement
-    addTestSource('main() { C<^> c; }');
-    assertOpType(typeNames: true);
-  }
-
-  test_TypeArgumentList2() {
-    // TypeName  TypeArgumentList  TypeName
-    addTestSource('main() { C<C^> c; }');
-    assertOpType(typeNames: true);
   }
 
   test_TypeParameter() {
@@ -1141,12 +772,6 @@ class C2 {
     // VariableDeclarationStatement  Block
     addTestSource('main() {var ^}');
     assertOpType();
-  }
-
-  test_VariableDeclarationList_final() {
-    // VariableDeclarationList  VariableDeclarationStatement  Block
-    addTestSource('main() {final ^}');
-    assertOpType(typeNames: true);
   }
 
   test_VariableDeclarationStatement_afterSemicolon() {

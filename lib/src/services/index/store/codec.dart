@@ -13,6 +13,7 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_general.dart';
 
+
 /**
  * A helper that encodes/decodes [AnalysisContext]s from/to integers.
  */
@@ -62,6 +63,7 @@ class ContextCodec {
     }
   }
 }
+
 
 /**
  * A helper that encodes/decodes [Element]s to/from integers.
@@ -211,8 +213,8 @@ class ElementCodec {
   /**
    * If [usePath] is `true` then [Source] path should be used instead of URI.
    */
-  List<int> _getLocationPath(
-      Element element, ElementLocation location, bool usePath) {
+  List<int> _getLocationPath(Element element, ElementLocation location,
+      bool usePath) {
     // prepare the location components
     List<String> components = location.components;
     if (usePath) {
@@ -264,6 +266,7 @@ class ElementCodec {
   }
 }
 
+
 /**
  * A helper that encodes/decodes [Relationship]s to/from integers.
  */
@@ -282,6 +285,7 @@ class RelationshipCodec {
     return _stringCodec.encode(id);
   }
 }
+
 
 /**
  * A helper that encodes/decodes [String]s from/to integers.

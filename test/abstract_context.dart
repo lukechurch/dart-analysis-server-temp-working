@@ -14,6 +14,7 @@ import 'package:analyzer/src/generated/source_io.dart';
 
 import 'mock_sdk.dart';
 
+
 /**
  * Finds an [Element] with the given [name].
  */
@@ -31,10 +32,12 @@ Element findChildElement(Element root, String name, [ElementKind kind]) {
   return result;
 }
 
+
 /**
  * A function to be called for every [Element].
  */
 typedef void _ElementVisitorFunction(Element element);
+
 
 class AbstractContextTest {
   static final DartSdk SDK = new MockSdk();
@@ -85,6 +88,7 @@ class AbstractContextTest {
     provider = null;
   }
 }
+
 
 /**
  * Wraps the given [_ElementVisitorFunction] into an instance of

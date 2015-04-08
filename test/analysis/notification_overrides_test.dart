@@ -13,10 +13,12 @@ import 'package:unittest/unittest.dart';
 import '../analysis_abstract.dart';
 import '../reflective_tests.dart';
 
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(AnalysisNotificationOverridesTest);
 }
+
 
 @reflectiveTest
 class AnalysisNotificationOverridesTest extends AbstractAnalysisTest {
@@ -34,8 +36,9 @@ class AnalysisNotificationOverridesTest extends AbstractAnalysisTest {
         return;
       }
     }
-    fail('Expect to find an overridden interface members at $offset in '
-        '${override.interfaceMembers.join('\n')}');
+    fail(
+        'Expect to find an overridden interface members at $offset in '
+            '${override.interfaceMembers.join('\n')}');
   }
 
   /**
@@ -88,16 +91,18 @@ class AnalysisNotificationOverridesTest extends AbstractAnalysisTest {
     for (Override override in overridesList) {
       if (override.offset == offset && override.length == length) {
         if (exists == false) {
-          fail('Not expected to find (offset=$offset; length=$length) in\n'
-              '${overridesList.join('\n')}');
+          fail(
+              'Not expected to find (offset=$offset; length=$length) in\n'
+                  '${overridesList.join('\n')}');
         }
         this.override = override;
         return;
       }
     }
     if (exists == true) {
-      fail('Expected to find (offset=$offset; length=$length) in\n'
-          '${overridesList.join('\n')}');
+      fail(
+          'Expected to find (offset=$offset; length=$length) in\n'
+              '${overridesList.join('\n')}');
     }
   }
 
@@ -135,40 +140,6 @@ class B implements A {
         assertNoSuperMember();
         assertHasInterfaceMember('m() {} // in A');
       });
-    });
-  }
-
-  test_definedInInterface_ofInterface() {
-    addTestFile('''
-class A {
-  m() {} // in A
-}
-class B implements A {}
-class C implements B {
-  m() {} // in C
-}
-''');
-    return prepareOverrides().then((_) {
-      assertHasOverride('m() {} // in C');
-      assertNoSuperMember();
-      assertHasInterfaceMember('m() {} // in A');
-    });
-  }
-
-  test_definedInInterface_ofSuper() {
-    addTestFile('''
-class A {
-  m() {} // in A
-}
-class B implements A {}
-class C extends B {
-  m() {} // in C
-}
-''');
-    return prepareOverrides().then((_) {
-      assertHasOverride('m() {} // in C');
-      assertNoSuperMember();
-      assertHasInterfaceMember('m() {} // in A');
     });
   }
 
@@ -354,20 +325,6 @@ class C extends B {
       assertHasOverride('m() {} // in C');
       assertHasSuperElement('m() {} // in A');
       assertNoInterfaceMembers();
-    });
-  }
-
-  test_super_method_superTypeCycle() {
-    addTestFile('''
-class A extends B {
-  m() {} // in A
-}
-class B extends A {
-  m() {} // in B
-}
-''');
-    return prepareOverrides().then((_) {
-      // must finish
     });
   }
 

@@ -16,11 +16,13 @@ import 'package:unittest/unittest.dart';
 import '../../abstract_single_unit.dart';
 import '../../reflective_tests.dart';
 
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(RefactoringLocationTest);
   runReflectiveTests(RefactoringStatusTest);
 }
+
 
 @reflectiveTest
 class RefactoringLocationTest extends AbstractSingleUnitTest {
@@ -71,6 +73,7 @@ main() {
     expect(location.length, range.length);
   }
 }
+
 
 @reflectiveTest
 class RefactoringStatusTest {

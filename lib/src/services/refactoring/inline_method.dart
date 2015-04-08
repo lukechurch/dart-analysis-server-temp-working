@@ -21,6 +21,7 @@ import 'package:analyzer/src/generated/element.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 
+
 /**
  * Returns the [SourceRange] to find conflicting locals in.
  */
@@ -40,6 +41,7 @@ SourceRange _getLocalsConflictingRange(AstNode node) {
   // not a part of a declaration with locals
   return SourceRange.EMPTY;
 }
+
 
 /**
  * Returns the source which should replace given invocation with given
@@ -72,7 +74,8 @@ String _getMethodSourceForInvocation(RefactoringStatus status, _SourcePart part,
     } else {
       // report about a missing required parameter
       if (parameter.parameterKind == ParameterKind.REQUIRED) {
-        status.addError('No argument for the parameter "${parameter.name}".',
+        status.addError(
+            'No argument for the parameter "${parameter.name}".',
             newLocation_fromNode(contextNode));
         return;
       }
@@ -143,6 +146,7 @@ String _getMethodSourceForInvocation(RefactoringStatus status, _SourcePart part,
   return SourceEdit.applySequence(part._source, edits);
 }
 
+
 /**
  * Returns the names which will shadow or will be shadowed by any declaration
  * at [node].
@@ -184,11 +188,12 @@ Set<String> _getNamesConflictingAt(AstNode node) {
   return result;
 }
 
+
 /**
  * [InlineMethodRefactoring] implementation.
  */
-class InlineMethodRefactoringImpl extends RefactoringImpl
-    implements InlineMethodRefactoring {
+class InlineMethodRefactoringImpl extends RefactoringImpl implements
+    InlineMethodRefactoring {
   final SearchEngine searchEngine;
   final CompilationUnit unit;
   final int offset;
@@ -261,7 +266,9 @@ class InlineMethodRefactoringImpl extends RefactoringImpl
       SourceRange methodRange = rangeNode(_methodNode);
       SourceRange linesRange = _methodUtils.getLinesRange(methodRange);
       doSourceChange_addElementEdit(
-          change, _methodElement, newSourceEdit_range(linesRange, ''));
+          change,
+          _methodElement,
+          newSourceEdit_range(linesRange, ''));
     }
     // done
     return new Future.value(result);
@@ -411,11 +418,13 @@ class InlineMethodRefactoringImpl extends RefactoringImpl
   }
 }
 
+
 class _ParameterOccurrence {
   final int parentPrecedence;
   final SourceRange range;
   _ParameterOccurrence(this.parentPrecedence, this.range);
 }
+
 
 /**
  * Processor for single [SearchMatch] reference to [methodElement].
@@ -496,17 +505,25 @@ class _ReferenceProcessor {
     // we don't support cascade
     if (cascaded) {
       status.addError(
-          'Cannot inline cascade invocation.', newLocation_fromNode(usage));
+          'Cannot inline cascade invocation.',
+          newLocation_fromNode(usage));
     }
     // can we inline method body into "methodUsage" block?
     if (_canInlineBody(usage)) {
       // insert non-return statements
       if (ref._methodStatementsPart != null) {
         // prepare statements source for invocation
-        String source = _getMethodSourceForInvocation(status,
-            ref._methodStatementsPart, _refUtils, usage, target, arguments);
+        String source = _getMethodSourceForInvocation(
+            status,
+            ref._methodStatementsPart,
+            _refUtils,
+            usage,
+            target,
+            arguments);
         source = _refUtils.replaceSourceIndent(
-            source, ref._methodStatementsPart._prefix, _refPrefix);
+            source,
+            ref._methodStatementsPart._prefix,
+            _refPrefix);
         // do insert
         SourceRange range = rangeStartLength(_refLineRange, 0);
         SourceEdit edit = newSourceEdit_range(range, source);
@@ -515,8 +532,13 @@ class _ReferenceProcessor {
       // replace invocation with return expression
       if (ref._methodExpressionPart != null) {
         // prepare expression source for invocation
-        String source = _getMethodSourceForInvocation(status,
-            ref._methodExpressionPart, _refUtils, usage, target, arguments);
+        String source = _getMethodSourceForInvocation(
+            status,
+            ref._methodExpressionPart,
+            _refUtils,
+            usage,
+            target,
+            arguments);
         if (getExpressionPrecedence(ref._methodExpression) <
             getExpressionParentPrecedence(usage)) {
           source = "(${source})";
@@ -534,8 +556,8 @@ class _ReferenceProcessor {
     // inline as closure invocation
     String source;
     {
-      source = ref._methodUtils.getRangeText(rangeStartEnd(
-          ref._methodParameters.leftParenthesis, ref._methodNode));
+      source = ref._methodUtils.getRangeText(
+          rangeStartEnd(ref._methodParameters.leftParenthesis, ref._methodNode));
       String methodPrefix =
           ref._methodUtils.getLinePrefix(ref._methodNode.offset);
       source = _refUtils.replaceSourceIndent(source, methodPrefix, _refPrefix);
@@ -559,11 +581,16 @@ class _ReferenceProcessor {
       Expression target = invocation.target;
       List<Expression> arguments = invocation.argumentList.arguments;
       _inlineMethodInvocation(
-          status, invocation, invocation.isCascaded, target, arguments);
+          status,
+          invocation,
+          invocation.isCascaded,
+          target,
+          arguments);
     } else {
       // cannot inline reference to method: var v = new A().method;
       if (ref._methodElement is MethodElement) {
-        status.addFatalError('Cannot inline class method reference.',
+        status.addFatalError(
+            'Cannot inline class method reference.',
             newLocation_fromNode(_node));
         return;
       }
@@ -598,8 +625,8 @@ class _ReferenceProcessor {
       // not invocation, just reference to function
       String source;
       {
-        source = ref._methodUtils.getRangeText(rangeStartEnd(
-            ref._methodParameters.leftParenthesis, ref._methodNode));
+        source = ref._methodUtils.getRangeText(
+            rangeStartEnd(ref._methodParameters.leftParenthesis, ref._methodNode));
         String methodPrefix =
             ref._methodUtils.getLinePrefix(ref._methodNode.offset);
         source =
@@ -692,8 +719,8 @@ class _SourcePart {
     _implicitThisOffsets.add(offset - _base);
   }
 
-  void addParameterOccurrence(
-      ParameterElement parameter, SourceRange range, int precedence) {
+  void addParameterOccurrence(ParameterElement parameter, SourceRange range,
+      int precedence) {
     if (parameter != null) {
       List<_ParameterOccurrence> occurrences = _parameters[parameter];
       if (occurrences == null) {
@@ -805,7 +832,9 @@ class _VariablesVisitor extends GeneralizingAstVisitor {
     SourceRange nodeRange = rangeNode(node);
     int parentPrecedence = getExpressionParentPrecedence(node);
     result.addParameterOccurrence(
-        parameterElement, nodeRange, parentPrecedence);
+        parameterElement,
+        nodeRange,
+        parentPrecedence);
   }
 
   void _addVariable(SimpleIdentifier node) {

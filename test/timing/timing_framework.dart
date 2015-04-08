@@ -59,6 +59,7 @@ class TimingResult {
    * milliseconds.
    */
   int get minTime {
+
     int minTime = times[0];
     int count = times.length;
     for (int i = 1; i < count; i++) {

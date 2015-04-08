@@ -15,6 +15,7 @@ import 'package:unittest/unittest.dart';
 
 import '../analysis_abstract.dart';
 
+
 class AbstractSearchDomainTest extends AbstractAnalysisTest {
   final Map<String, _ResultSet> resultSets = {};
   String searchId;
@@ -101,6 +102,7 @@ class AbstractSearchDomainTest extends AbstractAnalysisTest {
     return new Future.delayed(Duration.ZERO, waitForSearchResults);
   }
 }
+
 
 class _ResultSet {
   final String id;

@@ -8,7 +8,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:analysis_server/plugin/plugin.dart';
 import 'package:analysis_server/src/analysis_server.dart';
+import 'package:analysis_server/src/plugin/plugin_impl.dart';
 import 'package:analysis_server/src/plugin/server_plugin.dart';
 import 'package:analysis_server/src/server/http_server.dart';
 import 'package:analysis_server/src/server/stdio_server.dart';
@@ -17,14 +19,12 @@ import 'package:analysis_server/starter.dart';
 import 'package:analyzer/file_system/physical_file_system.dart';
 import 'package:analyzer/instrumentation/file_instrumentation.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
-import 'package:analyzer/options.dart';
-import 'package:analyzer/plugin/plugin.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/incremental_logger.dart';
 import 'package:analyzer/src/generated/java_io.dart';
 import 'package:analyzer/src/generated/sdk.dart';
 import 'package:analyzer/src/generated/sdk_io.dart';
-import 'package:analyzer/src/plugin/plugin_impl.dart';
+import 'package:analyzer/options.dart';
 import 'package:args/args.dart';
 
 /**
@@ -51,6 +51,7 @@ void _initIncrementalLogger(String spec) {
     logger = new StringSinkLogger(sink);
   }
 }
+
 
 /**
  * The [Driver] class represents a single running instance of the analysis
@@ -121,9 +122,8 @@ class Driver implements ServerStarter {
   static const String INTERNAL_DELAY_FREQUENCY = 'internal-delay-frequency';
 
   /**
-   * The option for specifying the http diagnostic port.
-   * If specified, users can review server status and performance information
-   * by opening a web browser on http://localhost:<port>
+   * The name of the option used to specify the port to which the server will
+   * connect.
    */
   static const String PORT_OPTION = "port";
 
@@ -190,7 +190,7 @@ class Driver implements ServerStarter {
 //    if (results[ENABLE_INSTRUMENTATION_OPTION]) {
 //      if (instrumentationServer == null) {
 //        print('Exiting server: enabled instrumentation without providing an instrumentation server');
-//        print('');xx
+//        print('');
 //        _printUsage(parser);
 //        return;
 //      }
@@ -254,25 +254,27 @@ class Driver implements ServerStarter {
     }
     InstrumentationService service =
         new InstrumentationService(instrumentationServer);
-    service.logVersion(_readUuid(service), results[CLIENT_ID],
-        results[CLIENT_VERSION], AnalysisServer.VERSION, defaultSdk.sdkVersion);
+    service.logVersion(
+        _readUuid(service),
+        results[CLIENT_ID],
+        results[CLIENT_VERSION],
+        AnalysisServer.VERSION,
+        defaultSdk.sdkVersion);
     AnalysisEngine.instance.instrumentationService = service;
     //
     // Process all of the plugins so that extensions are registered.
     //
     ServerPlugin serverPlugin = new ServerPlugin();
     List<Plugin> plugins = <Plugin>[];
-    plugins.add(AnalysisEngine.instance.enginePlugin);
     plugins.add(serverPlugin);
     plugins.addAll(_userDefinedPlugins);
     ExtensionManager manager = new ExtensionManager();
     manager.processPlugins(plugins);
 
-    socketServer = new SocketServer(
-        analysisServerOptions, defaultSdk, service, serverPlugin);
+    socketServer =
+        new SocketServer(analysisServerOptions, defaultSdk, service, serverPlugin);
     httpServer = new HttpAnalysisServer(socketServer);
     stdioServer = new StdioAnalysisServer(socketServer);
-    socketServer.userDefinedPlugins = _userDefinedPlugins;
 
     if (serve_http) {
       httpServer.serveHttp(port);
@@ -287,9 +289,7 @@ class Driver implements ServerStarter {
         exit(0);
       });
     },
-        print: results[INTERNAL_PRINT_TO_CONSOLE]
-            ? null
-            : httpServer.recordPrint);
+        print: results[INTERNAL_PRINT_TO_CONSOLE] ? null : httpServer.recordPrint);
   }
 
   /**
@@ -300,22 +300,24 @@ class Driver implements ServerStarter {
    */
   dynamic _captureExceptions(InstrumentationService service, dynamic callback(),
       {void print(String line)}) {
-    Function errorFunction = (Zone self, ZoneDelegate parent, Zone zone,
-        dynamic exception, StackTrace stackTrace) {
+    Function errorFunction =
+        (Zone self, ZoneDelegate parent, Zone zone, dynamic exception,
+            StackTrace stackTrace) {
       service.logPriorityException(exception, stackTrace);
       AnalysisServer analysisServer = socketServer.analysisServer;
       analysisServer.sendServerErrorNotification(exception, stackTrace);
       throw exception;
     };
-    Function printFunction = print == null
-        ? null
-        : (Zone self, ZoneDelegate parent, Zone zone, String line) {
+    Function printFunction = print == null ?
+        null :
+        (Zone self, ZoneDelegate parent, Zone zone, String line) {
       // Note: we don't pass the line on to stdout, because that is reserved
       // for communication to the client.
       print(line);
     };
     ZoneSpecification zoneSpecification = new ZoneSpecification(
-        handleUncaughtError: errorFunction, print: printFunction);
+        handleUncaughtError: errorFunction,
+        print: printFunction);
     return runZoned(callback, zoneSpecification: zoneSpecification);
   }
 
@@ -325,45 +327,58 @@ class Driver implements ServerStarter {
   CommandLineParser _createArgParser() {
     CommandLineParser parser =
         new CommandLineParser(alwaysIgnoreUnrecognized: true);
-    parser.addOption(CLIENT_ID,
+    parser.addOption(
+        CLIENT_ID,
         help: "an identifier used to identify the client");
     parser.addOption(CLIENT_VERSION, help: "the version of the client");
-    parser.addFlag(ENABLE_INCREMENTAL_RESOLUTION_API,
+    parser.addFlag(
+        ENABLE_INCREMENTAL_RESOLUTION_API,
         help: "enable using incremental resolution for API changes",
         defaultsTo: false,
         negatable: false);
-    parser.addFlag(ENABLE_INSTRUMENTATION_OPTION,
+    parser.addFlag(
+        ENABLE_INSTRUMENTATION_OPTION,
         help: "enable sending instrumentation information to a server",
         defaultsTo: false,
         negatable: false);
-    parser.addFlag(HELP_OPTION,
+    parser.addFlag(
+        HELP_OPTION,
         help: "print this help message without starting a server",
         defaultsTo: false,
         negatable: false);
-    parser.addOption(INCREMENTAL_RESOLUTION_LOG,
+    parser.addOption(
+        INCREMENTAL_RESOLUTION_LOG,
         help: "the description of the incremental resolution log");
-    parser.addFlag(INCREMENTAL_RESOLUTION_VALIDATION,
+    parser.addFlag(
+        INCREMENTAL_RESOLUTION_VALIDATION,
         help: "enable validation of incremental resolution results (slow)",
         defaultsTo: false,
         negatable: false);
-    parser.addOption(INSTRUMENTATION_LOG_FILE,
+    parser.addOption(
+        INSTRUMENTATION_LOG_FILE,
         help: "the path of the file to which instrumentation data will be written");
-    parser.addFlag(INTERNAL_PRINT_TO_CONSOLE,
+    parser.addFlag(
+        INTERNAL_PRINT_TO_CONSOLE,
         help: "enable sending `print` output to the console",
         defaultsTo: false,
         negatable: false);
-    parser.addOption(PORT_OPTION,
-        help: "the http diagnostic port on which the server provides"
-        " status and performance information");
+    parser.addOption(
+        PORT_OPTION,
+        help: "[port] the port on which the server will listen");
     parser.addOption(INTERNAL_DELAY_FREQUENCY);
     parser.addOption(SDK_OPTION, help: "[path] the path to the sdk");
-    parser.addFlag(NO_ERROR_NOTIFICATION,
+    parser.addFlag(
+        NO_ERROR_NOTIFICATION,
         help: "disable sending all analysis error notifications to the server",
         defaultsTo: false,
         negatable: false);
-    parser.addFlag(NO_INDEX,
-        help: "disable indexing sources", defaultsTo: false, negatable: false);
-    parser.addOption(FILE_READ_MODE,
+    parser.addFlag(
+        NO_INDEX,
+        help: "disable indexing sources",
+        defaultsTo: false,
+        negatable: false);
+    parser.addOption(
+        FILE_READ_MODE,
         help: "an option of the ways files can be read from disk, " +
             "some clients normalize end of line characters which would make " +
             "the file offset and range information incorrect.",
@@ -372,8 +387,7 @@ class Driver implements ServerStarter {
       "as-is": "file contents are read as-is, no file changes occur",
       "normalize-eol-always":
           r'file contents normalize the end of line characters to the single character new line `\n`'
-    },
-        defaultsTo: "as-is");
+    }, defaultsTo: "as-is");
 
     return parser;
   }
@@ -392,9 +406,9 @@ class Driver implements ServerStarter {
    * Read the UUID from disk, generating and storing a new one if necessary.
    */
   String _readUuid(InstrumentationService service) {
-    File uuidFile = new File(PhysicalResourceProvider.INSTANCE
-        .getStateLocation('.instrumentation')
-        .getChild('uuid.txt').path);
+    File uuidFile = new File(
+        PhysicalResourceProvider.INSTANCE.getStateLocation(
+            '.instrumentation').getChild('uuid.txt').path);
     try {
       if (uuidFile.existsSync()) {
         String uuid = uuidFile.readAsStringSync();

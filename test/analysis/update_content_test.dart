@@ -7,24 +7,24 @@ library test.analysis.updateContent;
 import 'package:analysis_server/src/constants.dart';
 import 'package:analysis_server/src/protocol.dart';
 import 'package:analysis_server/src/services/index/index.dart';
-import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/generated/ast.dart';
-import 'package:analyzer/src/generated/engine.dart';
-import 'package:analyzer/src/generated/source.dart';
 import 'package:typed_mock/typed_mock.dart';
 import 'package:unittest/unittest.dart';
 
 import '../analysis_abstract.dart';
 import '../reflective_tests.dart';
 
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(UpdateContentTest);
 }
 
+
 compilationUnitMatcher(String file) {
   return new _ArgumentMatcher_CompilationUnit(file);
 }
+
 
 @reflectiveTest
 class UpdateContentTest extends AbstractAnalysisTest {
@@ -54,17 +54,22 @@ class UpdateContentTest extends AbstractAnalysisTest {
     createProject();
     addTestFile('');
     await server.onAnalysisComplete;
-    server.setAnalysisSubscriptions(
-        {AnalysisService.NAVIGATION: [testFile].toSet()});
+    server.setAnalysisSubscriptions({
+      AnalysisService.NAVIGATION: [testFile].toSet()
+    });
     // update file, analyze, but don't sent notifications
     navigationCount = 0;
-    server.updateContent('1', {testFile: new AddContentOverlay('foo() {}')});
+    server.updateContent('1', {
+      testFile: new AddContentOverlay('foo() {}')
+    });
     server.test_performAllAnalysisOperations();
     expect(serverErrorCount, 0);
     expect(navigationCount, 0);
     // replace the file contents,
     // should discard any pending notification operations
-    server.updateContent('2', {testFile: new AddContentOverlay('bar() {}')});
+    server.updateContent('2', {
+      testFile: new AddContentOverlay('bar() {}')
+    });
     await server.onAnalysisComplete;
     expect(serverErrorCount, 0);
     expect(navigationCount, 1);
@@ -94,20 +99,23 @@ class UpdateContentTest extends AbstractAnalysisTest {
     await server.onAnalysisComplete;
     verify(server.index.indexUnit(anyObject, testUnitMatcher)).times(1);
     // add an overlay
-    server.updateContent(
-        '1', {testFile: new AddContentOverlay('main() { print(2); }')});
+    server.updateContent('1', {
+      testFile: new AddContentOverlay('main() { print(2); }')
+    });
     // Perform the next single operation: analysis.
     // It will schedule an indexing operation.
     await server.test_onOperationPerformed;
     // Update the file and remove an overlay.
     resourceProvider.updateFile(testFile, 'main() { print(2); }');
-    server.updateContent('2', {testFile: new RemoveContentOverlay()});
+    server.updateContent('2', {
+      testFile: new RemoveContentOverlay()
+    });
     // Validate that at the end the unit was indexed.
     await server.onAnalysisComplete;
     verify(server.index.indexUnit(anyObject, testUnitMatcher)).times(2);
   }
 
-  test_multiple_contexts() async {
+  test_multiple_contexts() {
     String fooPath = '/project1/foo.dart';
     resourceProvider.newFile(fooPath, '''
 library foo;
@@ -124,10 +132,10 @@ library baz;
 f(int i) {}
 ''');
     Request request = new AnalysisSetAnalysisRootsParams(
-        ['/project1', '/project2'], []).toRequest('0');
+        ['/project1', '/project2'],
+        []).toRequest('0');
     handleSuccessfulRequest(request);
-    {
-      await server.onAnalysisComplete;
+    return waitForTasksFinished().then((_) {
       // Files foo.dart and bar.dart should both have errors, since they both
       // call f() with the wrong number of arguments.
       expect(filesErrors[fooPath], hasLength(1));
@@ -139,42 +147,13 @@ library baz;
 f() {}
 ''')
       });
-    }
-    {
-      await server.onAnalysisComplete;
+      return waitForTasksFinished();
+    }).then((_) {
       // The overlay should have been propagated to both contexts, causing both
       // foo.dart and bar.dart to be reanalyzed and found to be free of errors.
       expect(filesErrors[fooPath], isEmpty);
       expect(filesErrors[barPath], isEmpty);
-    }
-  }
-
-  test_overlayOnly() async {
-    String filePath = '/User/project1/test.dart';
-    Folder folder1 = resourceProvider.newFolder('/User/project1');
-    Folder folder2 = resourceProvider.newFolder('/User/project2');
-    Request request = new AnalysisSetAnalysisRootsParams(
-        [folder1.path, folder2.path], []).toRequest('0');
-    handleSuccessfulRequest(request);
-    // exactly 2 contexts
-    expect(server.folderMap, hasLength(2));
-    AnalysisContext context1 = server.folderMap[folder1];
-    AnalysisContext context2 = server.folderMap[folder2];
-    // no sources
-    expect(_getUserSources(context1), isEmpty);
-    expect(_getUserSources(context2), isEmpty);
-    // add an overlay - new Source in context1
-    server.updateContent('1', {filePath: new AddContentOverlay('')});
-    {
-      List<Source> sources = _getUserSources(context1);
-      expect(sources, hasLength(1));
-      expect(sources[0].fullName, filePath);
-    }
-    expect(_getUserSources(context2), isEmpty);
-    // remove the overlay - no sources
-    server.updateContent('2', {filePath: new RemoveContentOverlay()});
-    expect(_getUserSources(context1), isEmpty);
-    expect(_getUserSources(context2), isEmpty);
+    });
   }
 
   test_sendNoticesAfterNopChange() async {
@@ -182,8 +161,9 @@ f() {}
     addTestFile('');
     await server.onAnalysisComplete;
     // add an overlay
-    server.updateContent(
-        '1', {testFile: new AddContentOverlay('main() {} main() {}')});
+    server.updateContent('1', {
+      testFile: new AddContentOverlay('main() {} main() {}')
+    });
     await server.onAnalysisComplete;
     // clear errors and make a no-op change
     filesErrors.clear();
@@ -200,8 +180,9 @@ f() {}
     addTestFile('');
     await server.onAnalysisComplete;
     // add an overlay
-    server.updateContent(
-        '1', {testFile: new AddContentOverlay('main() {} main() {}')});
+    server.updateContent('1', {
+      testFile: new AddContentOverlay('main() {} main() {}')
+    });
     await server.onAnalysisComplete;
     // clear errors and make a no-op change
     filesErrors.clear();
@@ -213,17 +194,8 @@ f() {}
     // errors should have been resent
     expect(filesErrors, isNotEmpty);
   }
-
-  List<Source> _getUserSources(AnalysisContext context) {
-    List<Source> sources = <Source>[];
-    context.sources.forEach((source) {
-      if (source.fullName.startsWith('/User/')) {
-        sources.add(source);
-      }
-    });
-    return sources;
-  }
 }
+
 
 class _ArgumentMatcher_CompilationUnit extends ArgumentMatcher {
   final String file;
@@ -235,6 +207,7 @@ class _ArgumentMatcher_CompilationUnit extends ArgumentMatcher {
     return arg is CompilationUnit && arg.element.source.fullName == file;
   }
 }
+
 
 class _MockIndex extends TypedMock implements Index {
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

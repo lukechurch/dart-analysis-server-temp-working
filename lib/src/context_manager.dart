@@ -19,15 +19,18 @@ import 'package:analyzer/src/generated/source_io.dart';
 import 'package:path/path.dart' as pathos;
 import 'package:watcher/watcher.dart';
 
+
 /**
  * The name of `packages` folders.
  */
 const String PACKAGES_NAME = 'packages';
 
+
 /**
  * File name of pubspec files.
  */
 const String PUBSPEC_NAME = 'pubspec.yaml';
+
 
 /**
  * Class that maintains a mapping from included/excluded paths to a set of
@@ -114,29 +117,6 @@ abstract class ContextManager {
   }
 
   /**
-   * Compute the set of files that are being flushed, this is defined as
-   * the set of sources in the removed context (context.sources), that are
-   * orphaned by this context being removed (no other context includes this
-   * file.)
-   */
-  List<String> computeFlushedFiles(Folder folder) {
-    AnalysisContext context = _contexts[folder].context;
-    HashSet<String> flushedFiles = new HashSet<String>();
-    for (Source source in context.sources) {
-      flushedFiles.add(source.fullName);
-    }
-    for (_ContextInfo contextInfo in _contexts.values) {
-      AnalysisContext contextN = contextInfo.context;
-      if (context != contextN) {
-        for (Source source in contextN.sources) {
-          flushedFiles.remove(source.fullName);
-        }
-      }
-    }
-    return flushedFiles.toList(growable: false);
-  }
-
-  /**
    * We have finished computing the package map.
    */
   void endComputePackageMap() {
@@ -208,8 +188,9 @@ abstract class ContextManager {
         includedFolders.add(resource);
       } else {
         // TODO(scheglov) implemented separate files analysis
-        throw new UnimplementedError('$path is not a folder. '
-            'Only support for folder analysis is implemented currently.');
+        throw new UnimplementedError(
+            '$path is not a folder. '
+                'Only support for folder analysis is implemented currently.');
       }
     }
     this.includedPaths = includedPaths;
@@ -271,8 +252,8 @@ abstract class ContextManager {
   /**
    * Called when the package map for a context has changed.
    */
-  void updateContextPackageUriResolver(
-      Folder contextFolder, UriResolver packageUriResolver);
+  void updateContextPackageUriResolver(Folder contextFolder,
+      UriResolver packageUriResolver);
 
   /**
    * Resursively adds all Dart and HTML files to the [changeSet].
@@ -282,14 +263,7 @@ abstract class ContextManager {
     if (info.excludesResource(folder)) {
       return;
     }
-    List<Resource> children;
-    try {
-      children = folder.getChildren();
-    } on FileSystemException {
-      // The folder no longer exists, or cannot be read, to there's nothing to
-      // do.
-      return;
-    }
+    List<Resource> children = folder.getChildren();
     for (Resource child in children) {
       String path = child.path;
       // add files, recurse into folders
@@ -299,7 +273,8 @@ abstract class ContextManager {
           continue;
         }
         // ignore if was not excluded
-        bool wasExcluded = _isExcludedBy(oldExcludedPaths, path) &&
+        bool wasExcluded =
+            _isExcludedBy(oldExcludedPaths, path) &&
             !_isExcludedBy(excludedPaths, path);
         if (!wasExcluded) {
           continue;
@@ -324,18 +299,11 @@ abstract class ContextManager {
     if (info.excludesResource(folder) || folder.shortName.startsWith('.')) {
       return;
     }
-    List<Resource> children = null;
-    try {
-      children = folder.getChildren();
-    } on FileSystemException {
-      // The directory either doesn't exist or cannot be read. Either way, there
-      // are no children that need to be added.
-      return;
-    }
+    List<Resource> children = folder.getChildren();
     for (Resource child in children) {
       String path = child.path;
       // ignore excluded files or folders
-      if (_isExcluded(path) || info.excludes(path)) {
+      if (_isExcluded(path)) {
         continue;
       }
       // add files, recurse into folders
@@ -376,7 +344,8 @@ abstract class ContextManager {
         return null;
       }
       return new PackageMapUriResolver(
-          resourceProvider, packageMapInfo.packageMap);
+          resourceProvider,
+          packageMapInfo.packageMap);
       // TODO(paulberry): if any of the dependencies is outside of [folder],
       // we'll need to watch their parent folders as well.
     }
@@ -385,10 +354,13 @@ abstract class ContextManager {
   /**
    * Create a new empty context associated with [folder].
    */
-  _ContextInfo _createContext(
-      Folder folder, File pubspecFile, List<_ContextInfo> children) {
+  _ContextInfo _createContext(Folder folder, File pubspecFile,
+      List<_ContextInfo> children) {
     _ContextInfo info = new _ContextInfo(
-        folder, pubspecFile, children, normalizedPackageRoots[folder.path]);
+        folder,
+        pubspecFile,
+        children,
+        normalizedPackageRoots[folder.path]);
     _contexts[folder] = info;
     info.changeSubscription = folder.changes.listen((WatchEvent event) {
       _handleWatchEvent(folder, info, event);
@@ -400,45 +372,42 @@ abstract class ContextManager {
   }
 
   /**
-   * Potentially create a new context associated with the given [folder].
+   * Creates a new context associated with [folder].
    *
-   * If there are subfolders with 'pubspec.yaml' files, separate contexts are
-   * created for them and excluded from the context associated with the
+   * If there are subfolders with 'pubspec.yaml' files, separate contexts
+   * are created for them, and excluded from the context associated with
    * [folder].
    *
+   * If [folder] itself contains a 'pubspec.yaml' file, subfolders are ignored.
+   *
    * If [withPubspecOnly] is `true`, a context will be created only if there
-   * is a 'pubspec.yaml' file in the [folder].
+   * is a 'pubspec.yaml' file in [folder].
    *
    * Returns create pubspec-based contexts.
    */
   List<_ContextInfo> _createContexts(Folder folder, bool withPubspecOnly) {
-    // try to find subfolders with pubspec files
-    List<_ContextInfo> children = <_ContextInfo>[];
-    try {
-      for (Resource child in folder.getChildren()) {
-        if (child is Folder) {
-          children.addAll(_createContexts(child, true));
-        }
-      }
-    } on FileSystemException {
-      // The directory either doesn't exist or cannot be read. Either way, there
-      // are no subfolders that need to be added.
-    }
     // check whether there is a pubspec in the folder
     File pubspecFile = folder.getChild(PUBSPEC_NAME);
     if (pubspecFile.exists) {
-      return <_ContextInfo>[
-        _createContextWithSources(folder, pubspecFile, children)
-      ];
+      _ContextInfo info =
+          _createContextWithSources(folder, pubspecFile, <_ContextInfo>[]);
+      return [info];
+    }
+    // try to find subfolders with pubspec files
+    List<_ContextInfo> children = <_ContextInfo>[];
+    for (Resource child in folder.getChildren()) {
+      if (child is Folder) {
+        List<_ContextInfo> childContexts = _createContexts(child, true);
+        children.addAll(childContexts);
+      }
     }
     // no pubspec, done
     if (withPubspecOnly) {
       return children;
     }
     // OK, create a context without a pubspec
-    return <_ContextInfo>[
-      _createContextWithSources(folder, pubspecFile, children)
-    ];
+    _createContextWithSources(folder, pubspecFile, children);
+    return children;
   }
 
   /**
@@ -446,8 +415,8 @@ abstract class ContextManager {
    * is the `pubspec.yaml` file contained in the folder. Add any sources that
    * are not included in one of the [children] to the context.
    */
-  _ContextInfo _createContextWithSources(
-      Folder folder, File pubspecFile, List<_ContextInfo> children) {
+  _ContextInfo _createContextWithSources(Folder folder, File pubspecFile,
+      List<_ContextInfo> children) {
     _ContextInfo info = _createContext(folder, pubspecFile, children);
     ChangeSet changeSet = new ChangeSet();
     _addSourceFiles(changeSet, folder, info);
@@ -460,8 +429,8 @@ abstract class ContextManager {
    */
   void _destroyContext(Folder folder) {
     _contexts[folder].changeSubscription.cancel();
-    removeContext(folder);
     _contexts.remove(folder);
+    removeContext(folder);
   }
 
   /**
@@ -499,12 +468,10 @@ abstract class ContextManager {
   }
 
   void _handleWatchEvent(Folder folder, _ContextInfo info, WatchEvent event) {
-    // TODO(brianwilkerson) If a file is explicitly included in one context
-    // but implicitly referenced in another context, we will only send a
-    // changeSet to the context that explicitly includes the file (because
-    // that's the only context that's watching the file).
     _instrumentationService.logWatchEvent(
-        folder.path, event.path, event.type.toString());
+        folder.path,
+        event.path,
+        event.type.toString());
     String path = event.path;
     // maybe excluded globally
     if (_isExcluded(path)) {
@@ -546,23 +513,19 @@ abstract class ContextManager {
           _mergeContext(info);
           return;
         }
-        List<Source> sources = info.context.getSourcesWithFullName(path);
-        if (!sources.isEmpty) {
+        Source source = info.sources[path];
+        if (source != null) {
           ChangeSet changeSet = new ChangeSet();
-          sources.forEach((Source source) {
-            changeSet.removedSource(source);
-          });
+          changeSet.removedSource(source);
           applyChangesToContext(folder, changeSet);
           info.sources.remove(path);
         }
         break;
       case ChangeType.MODIFY:
-        List<Source> sources = info.context.getSourcesWithFullName(path);
-        if (!sources.isEmpty) {
+        Source source = info.sources[path];
+        if (source != null) {
           ChangeSet changeSet = new ChangeSet();
-          sources.forEach((Source source) {
-            changeSet.changedSource(source);
-          });
+          changeSet.changedSource(source);
           applyChangesToContext(folder, changeSet);
         }
         break;

@@ -16,6 +16,7 @@ import 'package:analyzer/src/generated/scanner.dart';
  * for the local library in which the completion is requested.
  */
 class KeywordComputer extends DartCompletionComputer {
+
   @override
   bool computeFast(DartCompletionRequest request) {
     request.node.accept(new _KeywordVisitor(request));
@@ -44,45 +45,45 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
   @override
   visitBlock(Block node) {
     if (_isInClassMemberBody(node)) {
-      _addSuggestions([
-        Keyword.ASSERT,
-        Keyword.CASE,
-        Keyword.CONTINUE,
-        Keyword.DO,
-        Keyword.FINAL,
-        Keyword.FOR,
-        Keyword.IF,
-        Keyword.NEW,
-        Keyword.RETHROW,
-        Keyword.RETURN,
-        Keyword.SUPER,
-        Keyword.SWITCH,
-        Keyword.THIS,
-        Keyword.THROW,
-        Keyword.TRY,
-        Keyword.VAR,
-        Keyword.VOID,
-        Keyword.WHILE
-      ]);
+      _addSuggestions(
+          [
+              Keyword.ASSERT,
+              Keyword.CASE,
+              Keyword.CONTINUE,
+              Keyword.DO,
+              Keyword.FINAL,
+              Keyword.FOR,
+              Keyword.IF,
+              Keyword.NEW,
+              Keyword.RETHROW,
+              Keyword.RETURN,
+              Keyword.SUPER,
+              Keyword.SWITCH,
+              Keyword.THIS,
+              Keyword.THROW,
+              Keyword.TRY,
+              Keyword.VAR,
+              Keyword.VOID,
+              Keyword.WHILE]);
     } else {
-      _addSuggestions([
-        Keyword.ASSERT,
-        Keyword.CASE,
-        Keyword.CONTINUE,
-        Keyword.DO,
-        Keyword.FINAL,
-        Keyword.FOR,
-        Keyword.IF,
-        Keyword.NEW,
-        Keyword.RETHROW,
-        Keyword.RETURN,
-        Keyword.SWITCH,
-        Keyword.THROW,
-        Keyword.TRY,
-        Keyword.VAR,
-        Keyword.VOID,
-        Keyword.WHILE
-      ]);
+      _addSuggestions(
+          [
+              Keyword.ASSERT,
+              Keyword.CASE,
+              Keyword.CONTINUE,
+              Keyword.DO,
+              Keyword.FINAL,
+              Keyword.FOR,
+              Keyword.IF,
+              Keyword.NEW,
+              Keyword.RETHROW,
+              Keyword.RETURN,
+              Keyword.SWITCH,
+              Keyword.THROW,
+              Keyword.TRY,
+              Keyword.VAR,
+              Keyword.VOID,
+              Keyword.WHILE]);
     }
   }
 
@@ -94,18 +95,18 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
     }
     // Inside the class declaration { }
     if (request.offset > node.leftBracket.offset) {
-      _addSuggestions([
-        Keyword.CONST,
-        Keyword.DYNAMIC,
-        Keyword.FACTORY,
-        Keyword.FINAL,
-        Keyword.GET,
-        Keyword.OPERATOR,
-        Keyword.SET,
-        Keyword.STATIC,
-        Keyword.VAR,
-        Keyword.VOID
-      ]);
+      _addSuggestions(
+          [
+              Keyword.CONST,
+              Keyword.DYNAMIC,
+              Keyword.FACTORY,
+              Keyword.FINAL,
+              Keyword.GET,
+              Keyword.OPERATOR,
+              Keyword.SET,
+              Keyword.STATIC,
+              Keyword.VAR,
+              Keyword.VOID]);
       return;
     }
     _addClassDeclarationKeywords(node);
@@ -145,17 +146,19 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
     }
     if (request.offset <= startOfDeclarations) {
       _addSuggestions(
-          [Keyword.EXPORT, Keyword.IMPORT, Keyword.PART], DART_RELEVANCE_HIGH);
+          [Keyword.EXPORT, Keyword.IMPORT, Keyword.PART],
+          DART_RELEVANCE_HIGH);
     }
     if (request.offset >= endOfDirectives) {
-      _addSuggestions([
-        Keyword.ABSTRACT,
-        Keyword.CLASS,
-        Keyword.CONST,
-        Keyword.FINAL,
-        Keyword.TYPEDEF,
-        Keyword.VAR
-      ], DART_RELEVANCE_HIGH);
+      _addSuggestions(
+          [
+              Keyword.ABSTRACT,
+              Keyword.CLASS,
+              Keyword.CONST,
+              Keyword.FINAL,
+              Keyword.TYPEDEF,
+              Keyword.VAR],
+          DART_RELEVANCE_HIGH);
     }
   }
 
@@ -216,16 +219,22 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
     }
   }
 
-  void _addSuggestion(Keyword keyword,
-      [int relevance = DART_RELEVANCE_DEFAULT]) {
+  void _addSuggestion(Keyword keyword, [int relevance =
+      DART_RELEVANCE_DEFAULT]) {
     String completion = keyword.syntax;
-    request.addSuggestion(new CompletionSuggestion(
-        CompletionSuggestionKind.KEYWORD,
-        relevance, completion, completion.length, 0, false, false));
+    request.suggestions.add(
+        new CompletionSuggestion(
+            CompletionSuggestionKind.KEYWORD,
+            relevance,
+            completion,
+            completion.length,
+            0,
+            false,
+            false));
   }
 
-  void _addSuggestions(List<Keyword> keywords,
-      [int relevance = DART_RELEVANCE_KEYWORD]) {
+  void _addSuggestions(List<Keyword> keywords, [int relevance =
+      DART_RELEVANCE_KEYWORD]) {
     keywords.forEach((Keyword keyword) {
       _addSuggestion(keyword, relevance);
     });

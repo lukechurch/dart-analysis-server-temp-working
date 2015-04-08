@@ -6,17 +6,17 @@ library services.src.correction.fix;
 
 import 'dart:collection';
 
-import 'package:analysis_server/src/protocol.dart'
-    hide AnalysisError, Element, ElementKind;
-import 'package:analysis_server/src/protocol_server.dart'
-    show doSourceChange_addElementEdit, doSourceChange_addSourceEdit;
+import 'package:analysis_server/src/protocol.dart' hide AnalysisError, Element,
+    ElementKind;
+import 'package:analysis_server/src/protocol_server.dart' show
+    doSourceChange_addElementEdit, doSourceChange_addSourceEdit;
 import 'package:analysis_server/src/services/correction/fix.dart';
 import 'package:analysis_server/src/services/correction/levenshtein.dart';
 import 'package:analysis_server/src/services/correction/name_suggestion.dart';
 import 'package:analysis_server/src/services/correction/namespace.dart';
 import 'package:analysis_server/src/services/correction/source_buffer.dart';
-import 'package:analysis_server/src/services/correction/source_range.dart'
-    as rf;
+import 'package:analysis_server/src/services/correction/source_range.dart' as
+    rf;
 import 'package:analysis_server/src/services/correction/strings.dart';
 import 'package:analysis_server/src/services/correction/util.dart';
 import 'package:analysis_server/src/services/search/hierarchy.dart';
@@ -32,10 +32,12 @@ import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/utilities_dart.dart';
 import 'package:path/path.dart';
 
+
 /**
  * A predicate is a one-argument function that returns a boolean value.
  */
-typedef bool ElementPredicate(Element argument);
+typedef bool Predicate<E>(E argument);
+
 
 /**
  * The computer for Dart fixes.
@@ -93,8 +95,9 @@ class FixProcessor {
     errorLength = error.length;
     errorEnd = errorOffset + errorLength;
     node = new NodeLocator.con1(errorOffset).searchWithin(unit);
-    coveredNode = new NodeLocator.con2(errorOffset, errorOffset + errorLength)
-        .searchWithin(unit);
+    coveredNode = new NodeLocator.con2(
+        errorOffset,
+        errorOffset + errorLength).searchWithin(unit);
     // analyze ErrorCode
     ErrorCode errorCode = error.errorCode;
     if (errorCode == StaticWarningCode.UNDEFINED_CLASS_BOOLEAN) {
@@ -134,7 +137,6 @@ class FixProcessor {
     }
     if (errorCode == CompileTimeErrorCode.URI_DOES_NOT_EXIST) {
       _addFix_createImportUri();
-      _addFix_createPartUri();
       _addFix_replaceImportUri();
     }
     if (errorCode == HintCode.DIVISION_OPTIMIZATION) {
@@ -146,23 +148,8 @@ class FixProcessor {
     if (errorCode == HintCode.TYPE_CHECK_IS_NULL) {
       _addFix_isNull();
     }
-    if (errorCode == HintCode.UNDEFINED_GETTER) {
-      _addFix_undefinedClassAccessor_useSimilar();
-      _addFix_createField();
-      _addFix_createGetter();
-    }
-    if (errorCode == HintCode.UNDEFINED_SETTER) {
-      _addFix_undefinedClassAccessor_useSimilar();
-      _addFix_createField();
-    }
     if (errorCode == HintCode.UNNECESSARY_CAST) {
       _addFix_removeUnnecessaryCast();
-    }
-    if (errorCode == HintCode.UNUSED_CATCH_CLAUSE) {
-      _addFix_removeUnusedCatchClause();
-    }
-    if (errorCode == HintCode.UNUSED_CATCH_STACK) {
-      _addFix_removeUnusedCatchStack();
     }
     if (errorCode == HintCode.UNUSED_IMPORT) {
       _addFix_removeUnusedImport();
@@ -186,7 +173,7 @@ class FixProcessor {
       _addFix_createConstructor_named();
     }
     if (errorCode ==
-            StaticWarningCode.NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE ||
+        StaticWarningCode.NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_ONE ||
         errorCode ==
             StaticWarningCode.NON_ABSTRACT_CLASS_INHERITS_ABSTRACT_MEMBER_TWO ||
         errorCode ==
@@ -214,19 +201,9 @@ class FixProcessor {
       _addFix_createClass();
       _addFix_undefinedClass_useSimilar();
     }
-    if (errorCode == StaticWarningCode.FINAL_NOT_INITIALIZED) {
-      _addFix_createConstructor_forUninitializedFinalFields();
-    }
-    if (errorCode == StaticWarningCode.FINAL_NOT_INITIALIZED_CONSTRUCTOR_1 ||
-        errorCode == StaticWarningCode.FINAL_NOT_INITIALIZED_CONSTRUCTOR_2 ||
-        errorCode ==
-            StaticWarningCode.FINAL_NOT_INITIALIZED_CONSTRUCTOR_3_PLUS) {
-      _addFix_updateConstructor_forUninitializedFinalFields();
-    }
     if (errorCode == StaticWarningCode.UNDEFINED_IDENTIFIER) {
       bool isAsync = _addFix_addAsync();
       if (!isAsync) {
-        _addFix_undefinedClassAccessor_useSimilar();
         _addFix_createField();
         _addFix_createGetter();
         _addFix_createFunction_forFunctionType();
@@ -234,9 +211,6 @@ class FixProcessor {
         _addFix_importLibrary_withTopLevelVariable();
         _addFix_createLocalVariable();
       }
-    }
-    if (errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE) {
-      _addFix_illegalAsyncReturnType();
     }
     if (errorCode == StaticTypeWarningCode.INSTANCE_ACCESS_TO_STATIC_MEMBER) {
       _addFix_useStaticAccess_method();
@@ -255,7 +229,6 @@ class FixProcessor {
       _addFix_undefinedFunction_create();
     }
     if (errorCode == StaticTypeWarningCode.UNDEFINED_GETTER) {
-      _addFix_undefinedClassAccessor_useSimilar();
       _addFix_createField();
       _addFix_createGetter();
       _addFix_createFunction_forFunctionType();
@@ -268,7 +241,6 @@ class FixProcessor {
       _addFix_undefinedFunction_create();
     }
     if (errorCode == StaticTypeWarningCode.UNDEFINED_SETTER) {
-      _addFix_undefinedClassAccessor_useSimilar();
       _addFix_createField();
     }
     // done
@@ -295,8 +267,8 @@ class FixProcessor {
     }
     // configure Change
     change.message = formatList(kind.message, args);
-    linkedPositionGroups.values
-        .forEach((group) => change.addLinkedEditGroup(group));
+    linkedPositionGroups.values.forEach(
+        (group) => change.addLinkedEditGroup(group));
     change.selection = exitPosition;
     // add imports
     addLibraryImports(change, unitLibraryElement, librariesToImport);
@@ -366,49 +338,6 @@ class FixProcessor {
     }
   }
 
-  /**
-   * Here we handle cases when there are no constructors in a class, and the
-   * class has uninitialized final fields.
-   */
-  void _addFix_createConstructor_forUninitializedFinalFields() {
-    if (node is! SimpleIdentifier || node.parent is! VariableDeclaration) {
-      return;
-    }
-    ClassDeclaration classDeclaration =
-        node.getAncestor((node) => node is ClassDeclaration);
-    // prepare names of uninitialized final fields
-    List<String> fieldNames = <String>[];
-    for (ClassMember member in classDeclaration.members) {
-      if (member is FieldDeclaration) {
-        VariableDeclarationList variableList = member.fields;
-        if (variableList.isFinal) {
-          fieldNames.addAll(variableList.variables
-              .where((v) => v.initializer == null)
-              .map((v) => v.name.name));
-        }
-      }
-    }
-    // prepare location for a new constructor
-    _ConstructorLocation targetLocation =
-        _prepareNewConstructorLocation(classDeclaration);
-    // build constructor source
-    SourceBuilder sb = new SourceBuilder(file, targetLocation.offset);
-    {
-      String indent = '  ';
-      sb.append(targetLocation.prefix);
-      sb.append(indent);
-      sb.append(classDeclaration.name.name);
-      sb.append('(');
-      sb.append(fieldNames.map((name) => 'this.$name').join(', '));
-      sb.append(');');
-      sb.append(targetLocation.suffix);
-    }
-    // insert source
-    _insertBuilder(sb, unitElement);
-    // add proposal
-    _addFix(FixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS, []);
-  }
-
   void _addFix_createConstructor_insteadOfSyntheticDefault() {
     TypeName typeName = null;
     ConstructorName constructorName = null;
@@ -461,7 +390,8 @@ class FixProcessor {
       sb.append(indent);
       sb.append(targetElement.name);
       _addFix_undefinedMethod_create_parameters(
-          sb, instanceCreation.argumentList);
+          sb,
+          instanceCreation.argumentList);
       sb.append(') {$eol$indent}');
       sb.append(targetLocation.suffix);
     }
@@ -522,7 +452,8 @@ class FixProcessor {
         sb.endPosition();
       }
       _addFix_undefinedMethod_create_parameters(
-          sb, instanceCreation.argumentList);
+          sb,
+          instanceCreation.argumentList);
       sb.append(') {$eol$indent}');
       sb.append(targetLocation.suffix);
     }
@@ -675,9 +606,6 @@ class FixProcessor {
   }
 
   void _addFix_createField() {
-    if (node is! SimpleIdentifier) {
-      return;
-    }
     SimpleIdentifier nameNode = node;
     String name = nameNode.name;
     // prepare target Expression
@@ -715,13 +643,8 @@ class FixProcessor {
       staticModifier = _inStaticContext();
     }
     utils.targetClassElement = targetClassElement;
-    // prepare target ClassDeclaration
-    AstNode targetTypeNode = targetClassElement.node;
-    if (targetTypeNode is! ClassDeclaration) {
-      return;
-    }
-    ClassDeclaration targetClassNode = targetTypeNode;
     // prepare location
+    ClassDeclaration targetClassNode = targetClassElement.node;
     _FieldLocation targetLocation = _prepareNewFieldLocation(targetClassNode);
     // build method source
     String targetFile = targetClassElement.source.fullName;
@@ -805,9 +728,6 @@ class FixProcessor {
   }
 
   void _addFix_createGetter() {
-    if (node is! SimpleIdentifier) {
-      return;
-    }
     SimpleIdentifier nameNode = node;
     String name = nameNode.name;
     if (!nameNode.inGetterContext()) {
@@ -848,13 +768,8 @@ class FixProcessor {
       staticModifier = _inStaticContext();
     }
     utils.targetClassElement = targetClassElement;
-    // prepare target ClassDeclaration
-    AstNode targetTypeNode = targetClassElement.node;
-    if (targetTypeNode is! ClassDeclaration) {
-      return;
-    }
-    ClassDeclaration targetClassNode = targetTypeNode;
     // prepare location
+    ClassDeclaration targetClassNode = targetClassElement.node;
     _FieldLocation targetLocation = _prepareNewGetterLocation(targetClassNode);
     // build method source
     String targetFile = targetClassElement.source.fullName;
@@ -908,9 +823,6 @@ class FixProcessor {
   }
 
   void _addFix_createLocalVariable() {
-    if (node is! SimpleIdentifier) {
-      return;
-    }
     SimpleIdentifier nameNode = node;
     String name = nameNode.name;
     // if variable is assigned, convert assignment into declaration
@@ -937,9 +849,7 @@ class FixProcessor {
       DartType type = _inferUndefinedExpressionType(node);
       if (!(type == null ||
           type is InterfaceType ||
-          type is FunctionType &&
-              type.element != null &&
-              !type.element.isSynthetic)) {
+          type is FunctionType && type.element != null && !type.element.isSynthetic)) {
         return;
       }
       _appendType(sb, type, groupId: 'TYPE', orVar: true);
@@ -1096,39 +1006,6 @@ class FixProcessor {
     _addFix(FixKind.CREATE_NO_SUCH_METHOD, []);
   }
 
-  void _addFix_createPartUri() {
-    if (node is SimpleStringLiteral && node.parent is PartDirective) {
-      PartDirective partDirective = node.parent;
-      Source source = partDirective.source;
-      if (source != null) {
-        String file = source.fullName;
-        String libName = unitLibraryElement.name;
-        SourceEdit edit = new SourceEdit(0, 0, 'part of $libName;$eol$eol');
-        change.addEdit(file, -1, edit);
-        doSourceChange_addSourceEdit(change, context, source, edit);
-        _addFix(FixKind.CREATE_FILE, [file]);
-      }
-    }
-  }
-
-  void _addFix_illegalAsyncReturnType() {
-    InterfaceType futureType = context.typeProvider.futureType;
-    String futureTypeCode = utils.getTypeSource(futureType, librariesToImport);
-    // prepare the existing type
-    TypeName typeName = node.getAncestor((n) => n is TypeName);
-    String nodeCode = utils.getNodeText(typeName);
-    // wrap the existing type with Future
-    String returnTypeCode;
-    if (nodeCode == 'void') {
-      returnTypeCode = futureTypeCode;
-    } else {
-      returnTypeCode = '$futureTypeCode<$nodeCode>';
-    }
-    _addReplaceEdit(rf.rangeNode(typeName), returnTypeCode);
-    // add proposal
-    _addFix(FixKind.REPLACE_RETURN_TYPE_FUTURE, []);
-  }
-
   void _addFix_importLibrary(FixKind kind, String importPath) {
     CompilationUnitElement libraryUnitElement =
         unitLibraryElement.definingCompilationUnit;
@@ -1191,10 +1068,9 @@ class FixProcessor {
       if (prefix != null) {
         SourceRange range = rf.rangeStartLength(node, 0);
         _addReplaceEdit(range, '${prefix.displayName}.');
-        _addFix(FixKind.IMPORT_LIBRARY_PREFIX, [
-          libraryElement.displayName,
-          prefix.displayName
-        ]);
+        _addFix(
+            FixKind.IMPORT_LIBRARY_PREFIX,
+            [libraryElement.displayName, prefix.displayName]);
         continue;
       }
       // may be update "show" directive
@@ -1214,7 +1090,9 @@ class FixProcessor {
         // update library
         String newShowCode = 'show ${StringUtils.join(showNames, ", ")}';
         _addReplaceEdit(
-            rf.rangeOffsetEnd(showCombinator), newShowCode, unitLibraryElement);
+            rf.rangeOffsetEnd(showCombinator),
+            newShowCode,
+            unitLibraryElement);
         _addFix(FixKind.IMPORT_LIBRARY_SHOW, [libraryName]);
         // we support only one import without prefix
         return;
@@ -1282,7 +1160,8 @@ class FixProcessor {
           String libraryPackageUri = findAbsoluteUri(context, libraryFile);
           if (libraryPackageUri != null) {
             _addFix_importLibrary(
-                FixKind.IMPORT_LIBRARY_PROJECT, libraryPackageUri);
+                FixKind.IMPORT_LIBRARY_PROJECT,
+                libraryPackageUri);
             continue;
           }
         }
@@ -1315,8 +1194,7 @@ class FixProcessor {
     if (_mayBeTypeIdentifier(node)) {
       String typeName = (node as SimpleIdentifier).name;
       _addFix_importLibrary_withElement(typeName, ElementKind.CLASS);
-      _addFix_importLibrary_withElement(
-          typeName, ElementKind.FUNCTION_TYPE_ALIAS);
+      _addFix_importLibrary_withElement(typeName, ElementKind.FUNCTION_TYPE_ALIAS);
     }
   }
 
@@ -1335,7 +1213,8 @@ class FixProcessor {
     if (coveredNode is IsExpression) {
       IsExpression isExpression = coveredNode as IsExpression;
       _addReplaceEdit(
-          rf.rangeEndEnd(isExpression.expression, isExpression), ' != null');
+          rf.rangeEndEnd(isExpression.expression, isExpression),
+          ' != null');
       _addFix(FixKind.USE_NOT_EQ_NULL, []);
     }
   }
@@ -1344,7 +1223,8 @@ class FixProcessor {
     if (coveredNode is IsExpression) {
       IsExpression isExpression = coveredNode as IsExpression;
       _addReplaceEdit(
-          rf.rangeEndEnd(isExpression.expression, isExpression), ' == null');
+          rf.rangeEndEnd(isExpression.expression, isExpression),
+          ' == null');
       _addFix(FixKind.USE_EQ_EQ_NULL, []);
     }
   }
@@ -1390,30 +1270,6 @@ class FixProcessor {
     _removeEnclosingParentheses(asExpression, expressionPrecedence);
     // done
     _addFix(FixKind.REMOVE_UNNECASSARY_CAST, []);
-  }
-
-  void _addFix_removeUnusedCatchClause() {
-    if (node is SimpleIdentifier) {
-      AstNode catchClause = node.parent;
-      if (catchClause is CatchClause &&
-          catchClause.exceptionParameter == node) {
-        _addRemoveEdit(
-            rf.rangeStartStart(catchClause.catchKeyword, catchClause.body));
-        _addFix(FixKind.REMOVE_UNUSED_CATCH_CLAUSE, []);
-      }
-    }
-  }
-
-  void _addFix_removeUnusedCatchStack() {
-    if (node is SimpleIdentifier) {
-      AstNode catchClause = node.parent;
-      if (catchClause is CatchClause &&
-          catchClause.stackTraceParameter == node &&
-          catchClause.exceptionParameter != null) {
-        _addRemoveEdit(rf.rangeEndEnd(catchClause.exceptionParameter, node));
-        _addFix(FixKind.REMOVE_UNUSED_CATCH_STACK, []);
-      }
-    }
   }
 
   void _addFix_removeUnusedImport() {
@@ -1472,7 +1328,8 @@ class FixProcessor {
   void _addFix_undefinedClass_useSimilar() {
     if (_mayBeTypeIdentifier(node)) {
       String name = (node as SimpleIdentifier).name;
-      _ClosestElementFinder finder = new _ClosestElementFinder(name,
+      _ClosestElementFinder finder = new _ClosestElementFinder(
+          name,
           (Element element) => element is ClassElement,
           MAX_LEVENSHTEIN_DISTANCE);
       // find closest element
@@ -1501,65 +1358,10 @@ class FixProcessor {
     }
   }
 
-  void _addFix_undefinedClassAccessor_useSimilar() {
-    AstNode node = this.node;
-    if (node is SimpleIdentifier) {
-      // prepare target
-      Expression target = null;
-      if (node.parent is PrefixedIdentifier) {
-        PrefixedIdentifier invocation = node.parent as PrefixedIdentifier;
-        target = invocation.prefix;
-      }
-      // find getter
-      if (node.inGetterContext()) {
-        _addFix_undefinedClassMember_useSimilar(target, (Element element) {
-          return element is PropertyAccessorElement && element.isGetter ||
-              element is FieldElement && element.getter != null;
-        });
-      }
-      // find setter
-      if (node.inSetterContext()) {
-        _addFix_undefinedClassMember_useSimilar(target, (Element element) {
-          return element is PropertyAccessorElement && element.isSetter ||
-              element is FieldElement && element.setter != null;
-        });
-      }
-    }
-  }
-
-  void _addFix_undefinedClassMember_useSimilar(
-      Expression target, ElementPredicate predicate) {
-    if (node is SimpleIdentifier) {
-      String name = (node as SimpleIdentifier).name;
-      _ClosestElementFinder finder =
-          new _ClosestElementFinder(name, predicate, MAX_LEVENSHTEIN_DISTANCE);
-      // unqualified invocation
-      if (target == null) {
-        ClassDeclaration clazz =
-            node.getAncestor((node) => node is ClassDeclaration);
-        if (clazz != null) {
-          ClassElement classElement = clazz.element;
-          _updateFinderWithClassMembers(finder, classElement);
-        }
-      } else {
-        DartType type = target.bestType;
-        if (type is InterfaceType) {
-          ClassElement classElement = type.element;
-          _updateFinderWithClassMembers(finder, classElement);
-        }
-      }
-      // if we have close enough element, suggest to use it
-      if (finder._element != null) {
-        String closestName = finder._element.name;
-        _addReplaceEdit(rf.rangeNode(node), closestName);
-        _addFix(FixKind.CHANGE_TO, [closestName]);
-      }
-    }
-  }
-
   void _addFix_undefinedFunction_create() {
     // should be the name of the invocation
-    if (node is SimpleIdentifier && node.parent is MethodInvocation) {} else {
+    if (node is SimpleIdentifier && node.parent is MethodInvocation) {
+    } else {
       return;
     }
     String name = (node as SimpleIdentifier).name;
@@ -1605,7 +1407,8 @@ class FixProcessor {
   void _addFix_undefinedFunction_useSimilar() {
     if (node is SimpleIdentifier) {
       String name = (node as SimpleIdentifier).name;
-      _ClosestElementFinder finder = new _ClosestElementFinder(name,
+      _ClosestElementFinder finder = new _ClosestElementFinder(
+          name,
           (Element element) => element is FunctionElement,
           MAX_LEVENSHTEIN_DISTANCE);
       // this library
@@ -1710,8 +1513,8 @@ class FixProcessor {
     }
   }
 
-  void _addFix_undefinedMethod_create_parameters(
-      SourceBuilder sb, ArgumentList argumentList) {
+  void _addFix_undefinedMethod_create_parameters(SourceBuilder sb,
+      ArgumentList argumentList) {
     // append parameters
     sb.append('(');
     Set<String> excluded = new Set();
@@ -1747,50 +1550,35 @@ class FixProcessor {
   }
 
   void _addFix_undefinedMethod_useSimilar() {
-    if (node.parent is MethodInvocation) {
+    if (node is SimpleIdentifier && node.parent is MethodInvocation) {
       MethodInvocation invocation = node.parent as MethodInvocation;
-      _addFix_undefinedClassMember_useSimilar(invocation.realTarget,
-          (Element element) => element is MethodElement && !element.isOperator);
-    }
-  }
-
-  /**
-   * Here we handle cases when a constructors does not initialize all of the
-   * final fields.
-   */
-  void _addFix_updateConstructor_forUninitializedFinalFields() {
-    if (node is! SimpleIdentifier || node.parent is! ConstructorDeclaration) {
-      return;
-    }
-    ConstructorDeclaration constructor = node.parent;
-    // add these fields
-    List<FieldElement> fields =
-        error.getProperty(ErrorProperty.NOT_INITIALIZED_FIELDS);
-    if (fields != null) {
-      // prepare new parameters code
-      fields.sort((a, b) => a.nameOffset - b.nameOffset);
-      String fieldParametersCode =
-          fields.map((field) => 'this.${field.name}').join(', ');
-      // prepare the last required parameter
-      FormalParameter lastRequiredParameter;
-      List<FormalParameter> parameters = constructor.parameters.parameters;
-      for (FormalParameter parameter in parameters) {
-        if (parameter.kind == ParameterKind.REQUIRED) {
-          lastRequiredParameter = parameter;
+      String name = (node as SimpleIdentifier).name;
+      _ClosestElementFinder finder = new _ClosestElementFinder(
+          name,
+          (Element element) => element is MethodElement && !element.isOperator,
+          MAX_LEVENSHTEIN_DISTANCE);
+      // unqualified invocation
+      Expression target = invocation.realTarget;
+      if (target == null) {
+        ClassDeclaration clazz =
+            invocation.getAncestor((node) => node is ClassDeclaration);
+        if (clazz != null) {
+          ClassElement classElement = clazz.element;
+          _updateFinderWithClassMembers(finder, classElement);
         }
-      }
-      // append new field formal initializers
-      if (lastRequiredParameter != null) {
-        _addInsertEdit(lastRequiredParameter.end, ', $fieldParametersCode');
       } else {
-        int offset = constructor.parameters.leftParenthesis.end;
-        if (parameters.isNotEmpty) {
-          fieldParametersCode += ', ';
+        DartType type = target.bestType;
+        if (type is InterfaceType) {
+          ClassElement classElement = type.element;
+          _updateFinderWithClassMembers(finder, classElement);
         }
-        _addInsertEdit(offset, fieldParametersCode);
       }
-      // add proposal
-      _addFix(FixKind.ADD_FIELD_FORMAL_PARAMETERS, []);
+      // if we have close enough element, suggest to use it
+      if (finder._element != null) {
+        String closestName = finder._element.name;
+        _addReplaceEdit(rf.rangeNode(node), closestName);
+        _addFix(FixKind.CHANGE_TO, [closestName]);
+      }
     }
   }
 
@@ -1799,7 +1587,8 @@ class FixProcessor {
       if (n is MethodInvocation &&
           n.offset == errorOffset &&
           n.length == errorLength) {
-        Expression target = n.target;
+        MethodInvocation invocation = n as MethodInvocation;
+        Expression target = invocation.target;
         while (target is ParenthesizedExpression) {
           target = (target as ParenthesizedExpression).expression;
         }
@@ -1807,8 +1596,8 @@ class FixProcessor {
         BinaryExpression binary = target as BinaryExpression;
         _addReplaceEdit(rf.rangeToken(binary.operator), '~/');
         // remove everything before and after
-        _addRemoveEdit(rf.rangeStartStart(n, binary.leftOperand));
-        _addRemoveEdit(rf.rangeEndEnd(binary.rightOperand, n));
+        _addRemoveEdit(rf.rangeStartStart(invocation, binary.leftOperand));
+        _addRemoveEdit(rf.rangeEndEnd(binary.rightOperand, invocation));
         // add proposal
         _addFix(FixKind.USE_EFFECTIVE_INTEGER_DIVISION, []);
         // done
@@ -1960,8 +1749,16 @@ class FixProcessor {
     String prefix = '';
     String sourcePrefix = '$eol';
     String sourceSuffix = eol;
-    _addProposal_createFunction(functionType, name, unitSource, insertOffset,
-        false, prefix, sourcePrefix, sourceSuffix, unitElement);
+    _addProposal_createFunction(
+        functionType,
+        name,
+        unitSource,
+        insertOffset,
+        false,
+        prefix,
+        sourcePrefix,
+        sourceSuffix,
+        unitElement);
     // add proposal
     _addFix(FixKind.CREATE_FUNCTION, [name]);
   }
@@ -1970,8 +1767,8 @@ class FixProcessor {
    * Adds proposal for creating method corresponding to the given [FunctionType] in the given
    * [ClassElement].
    */
-  void _addProposal_createFunction_method(
-      ClassElement targetClassElement, FunctionType functionType) {
+  void _addProposal_createFunction_method(ClassElement targetClassElement,
+      FunctionType functionType) {
     String name = (node as SimpleIdentifier).name;
     // prepare environment
     Source targetSource = targetClassElement.source;
@@ -1987,8 +1784,15 @@ class FixProcessor {
       sourcePrefix = eol;
     }
     String sourceSuffix = eol;
-    _addProposal_createFunction(functionType, name, targetSource, insertOffset,
-        _inStaticContext(), prefix, sourcePrefix, sourceSuffix,
+    _addProposal_createFunction(
+        functionType,
+        name,
+        targetSource,
+        insertOffset,
+        _inStaticContext(),
+        prefix,
+        sourcePrefix,
+        sourceSuffix,
         targetClassElement);
     // add proposal
     _addFix(FixKind.CREATE_METHOD, [name]);
@@ -2063,8 +1867,8 @@ class FixProcessor {
     sb.append(parameterSource);
   }
 
-  void _appendType(SourceBuilder sb, DartType type,
-      {String groupId, bool orVar: false}) {
+  void _appendType(SourceBuilder sb, DartType type, {String groupId, bool orVar:
+      false}) {
     if (type != null && !type.isDynamic) {
       String typeSource = utils.getTypeSource(type, librariesToImport);
       if (groupId != null) {
@@ -2099,7 +1903,7 @@ class FixProcessor {
   }
 
   /**
-   * Returns the [DartType] with given name from the `dart:core` library.
+   * Returns the [Type] with given name from the `dart:core` library.
    */
   DartType _getCoreType(String name) {
     List<LibraryElement> libraries = unitLibraryElement.importedLibraries;
@@ -2295,8 +2099,8 @@ class FixProcessor {
     return node is SimpleIdentifier && node.name == 'await';
   }
 
-  _ConstructorLocation _prepareNewConstructorLocation(
-      ClassDeclaration classDeclaration) {
+  _ConstructorLocation
+      _prepareNewConstructorLocation(ClassDeclaration classDeclaration) {
     List<ClassMember> members = classDeclaration.members;
     // find the last field/constructor
     ClassMember lastFieldOrConstructor = null;
@@ -2310,12 +2114,16 @@ class FixProcessor {
     // after the last field/constructor
     if (lastFieldOrConstructor != null) {
       return new _ConstructorLocation(
-          eol + eol, lastFieldOrConstructor.end, '');
+          eol + eol,
+          lastFieldOrConstructor.end,
+          '');
     }
     // at the beginning of the class
     String suffix = members.isEmpty ? '' : eol;
     return new _ConstructorLocation(
-        eol, classDeclaration.leftBracket.end, suffix);
+        eol,
+        classDeclaration.leftBracket.end,
+        suffix);
   }
 
   _FieldLocation _prepareNewFieldLocation(ClassDeclaration classDeclaration) {
@@ -2333,12 +2141,16 @@ class FixProcessor {
     // after the last field
     if (lastFieldOrConstructor != null) {
       return new _FieldLocation(
-          eol + eol + indent, lastFieldOrConstructor.end, '');
+          eol + eol + indent,
+          lastFieldOrConstructor.end,
+          '');
     }
     // at the beginning of the class
     String suffix = members.isEmpty ? '' : eol;
     return new _FieldLocation(
-        eol + indent, classDeclaration.leftBracket.end, suffix);
+        eol + indent,
+        classDeclaration.leftBracket.end,
+        suffix);
   }
 
   _FieldLocation _prepareNewGetterLocation(ClassDeclaration classDeclaration) {
@@ -2362,7 +2174,9 @@ class FixProcessor {
     // at the beginning of the class
     String suffix = members.isEmpty ? '' : eol;
     return new _FieldLocation(
-        eol + indent, classDeclaration.leftBracket.end, suffix);
+        eol + indent,
+        classDeclaration.leftBracket.end,
+        suffix);
   }
 
   /**
@@ -2383,16 +2197,16 @@ class FixProcessor {
     }
   }
 
-  void _updateFinderWithClassMembers(
-      _ClosestElementFinder finder, ClassElement clazz) {
+  void _updateFinderWithClassMembers(_ClosestElementFinder finder,
+      ClassElement clazz) {
     if (clazz != null) {
       List<Element> members = getMembers(clazz);
       finder._updateList(members);
     }
   }
 
-  static void _addSuperTypeProposals(
-      SourceBuilder sb, Set<DartType> alreadyAdded, DartType type) {
+  static void _addSuperTypeProposals(SourceBuilder sb,
+      Set<DartType> alreadyAdded, DartType type) {
     if (type != null &&
         !alreadyAdded.contains(type) &&
         type.element is ClassElement) {
@@ -2409,8 +2223,8 @@ class FixProcessor {
   /**
    * @return the suggestions for given [Type] and [DartExpression], not empty.
    */
-  static List<String> _getArgumentNameSuggestions(
-      Set<String> excluded, DartType type, Expression expression, int index) {
+  static List<String> _getArgumentNameSuggestions(Set<String> excluded,
+      DartType type, Expression expression, int index) {
     List<String> suggestions =
         getVariableNameSuggestionsForExpression(type, expression, excluded);
     if (suggestions.length != 0) {
@@ -2447,7 +2261,7 @@ class FixProcessor {
  */
 class _ClosestElementFinder {
   final String _targetName;
-  final ElementPredicate _predicate;
+  final Predicate<Element> _predicate;
 
   Element _element = null;
   int _distance;
@@ -2471,6 +2285,7 @@ class _ClosestElementFinder {
   }
 }
 
+
 /**
  * Describes the location for a newly created [ConstructorDeclaration].
  */
@@ -2481,6 +2296,7 @@ class _ConstructorLocation {
 
   _ConstructorLocation(this.prefix, this.offset, this.suffix);
 }
+
 
 /**
  * Describes the location for a newly created [FieldDeclaration].

@@ -12,10 +12,12 @@ import 'package:unittest/unittest.dart';
 import '../../abstract_single_unit.dart';
 import '../../reflective_tests.dart';
 
+
 main() {
   groupSep = ' | ';
   runReflectiveTests(AssistProcessorTest);
 }
+
 
 @reflectiveTest
 class AssistProcessorTest extends AbstractSingleUnitTest {
@@ -45,8 +47,8 @@ class AssistProcessorTest extends AbstractSingleUnitTest {
   /**
    * Calls [assertHasAssist] at the offset of [offsetSearch] in [testCode].
    */
-  void assertHasAssistAt(
-      String offsetSearch, AssistKind kind, String expected) {
+  void assertHasAssistAt(String offsetSearch, AssistKind kind,
+      String expected) {
     offset = findOffset(offsetSearch);
     assertHasAssist(kind, expected);
   }
@@ -84,8 +86,8 @@ class AssistProcessorTest extends AbstractSingleUnitTest {
     return positions;
   }
 
-  List<LinkedEditSuggestion> expectedSuggestions(
-      LinkedEditSuggestionKind kind, List<String> values) {
+  List<LinkedEditSuggestion> expectedSuggestions(LinkedEditSuggestionKind kind,
+      List<String> values) {
     return values.map((value) {
       return new LinkedEditSuggestion(value, kind);
     }).toList();
@@ -95,73 +97,6 @@ class AssistProcessorTest extends AbstractSingleUnitTest {
     super.setUp();
     offset = 0;
     length = 0;
-  }
-
-  void test_addTypeAnnotation_BAD_privateType_closureParameter() {
-    addSource('/my_lib.dart', '''
-library my_lib;
-class A {}
-class _B extends A {}
-foo(f(_B p)) {}
-''');
-    resolveTestUnit('''
-import 'my_lib.dart';
-main() {
-  foo((test) {});
-}
- ''');
-    assertNoAssistAt('test)', AssistKind.ADD_TYPE_ANNOTATION);
-  }
-
-  void test_addTypeAnnotation_BAD_privateType_declaredIdentifier() {
-    addSource('/my_lib.dart', '''
-library my_lib;
-class A {}
-class _B extends A {}
-List<_B> getValues() => [];
-''');
-    resolveTestUnit('''
-import 'my_lib.dart';
-class A<T> {
-  main() {
-    for (var item in getValues()) {
-    }
-  }
-}
-''');
-    assertNoAssistAt('var item', AssistKind.ADD_TYPE_ANNOTATION);
-  }
-
-  void test_addTypeAnnotation_BAD_privateType_list() {
-    addSource('/my_lib.dart', '''
-library my_lib;
-class A {}
-class _B extends A {}
-List<_B> getValues() => [];
-''');
-    resolveTestUnit('''
-import 'my_lib.dart';
-main() {
-  var v = getValues();
-}
-''');
-    assertNoAssistAt('var ', AssistKind.ADD_TYPE_ANNOTATION);
-  }
-
-  void test_addTypeAnnotation_BAD_privateType_variable() {
-    addSource('/my_lib.dart', '''
-library my_lib;
-class A {}
-class _B extends A {}
-_B getValue() => new _B();
-''');
-    resolveTestUnit('''
-import 'my_lib.dart';
-main() {
-  var v = getValue();
-}
-''');
-    assertNoAssistAt('var ', AssistKind.ADD_TYPE_ANNOTATION);
   }
 
   void test_addTypeAnnotation_classField_OK_final() {
@@ -587,23 +522,6 @@ main() {
     assertNoAssistAt('var ', AssistKind.ADD_TYPE_ANNOTATION);
   }
 
-  void test_addTypeAnnotation_OK_privateType_sameLibrary() {
-    resolveTestUnit('''
-class _A {}
-_A getValue() => new _A();
-main() {
-  var v = getValue();
-}
-''');
-    assertHasAssistAt('var ', AssistKind.ADD_TYPE_ANNOTATION, '''
-class _A {}
-_A getValue() => new _A();
-main() {
-  _A v = getValue();
-}
-''');
-  }
-
   void test_addTypeAnnotation_parameter_BAD_hasExplicitType() {
     resolveTestUnit('''
 foo(f(int p)) {}
@@ -677,10 +595,12 @@ main() {
 }
 List<int> readBytes() => <int>[];
 ''');
-    _assertLinkedGroup(change.linkedEditGroups[0], [
-      'readBytes = '
-    ], expectedSuggestions(
-        LinkedEditSuggestionKind.VARIABLE, ['list', 'bytes2', 'readBytes']));
+    _assertLinkedGroup(
+        change.linkedEditGroups[0],
+        ['readBytes = '],
+        expectedSuggestions(
+            LinkedEditSuggestionKind.VARIABLE,
+            ['list', 'bytes2', 'readBytes']));
   }
 
   void test_assignToLocalVariable_alreadyAssignment() {
@@ -869,7 +789,9 @@ class A {
   }
 }
 ''');
-    assertHasAssistAt('{ // marker', AssistKind.CONVERT_INTO_EXPRESSION_BODY,
+    assertHasAssistAt(
+        '{ // marker',
+        AssistKind.CONVERT_INTO_EXPRESSION_BODY,
         '''
 class A {
   m() => 42;
@@ -928,153 +850,6 @@ fff() {
 }
 ''');
     assertNoAssistAt('fff()', AssistKind.CONVERT_INTO_EXPRESSION_BODY);
-  }
-
-  void test_convertToForIndex_BAD_bodyNotBlock() {
-    resolveTestUnit('''
-main(List<String> items) {
-  for (String item in items) print(item);
-}
-''');
-    assertNoAssistAt('for (String', AssistKind.CONVERT_INTO_FOR_INDEX);
-  }
-
-  void test_convertToForIndex_BAD_doesNotDeclareVariable() {
-    resolveTestUnit('''
-main(List<String> items) {
-  String item;
-  for (item in items) {
-    print(item);
-  }
-}
-''');
-    assertNoAssistAt('for (item', AssistKind.CONVERT_INTO_FOR_INDEX);
-  }
-
-  void test_convertToForIndex_BAD_iterableIsNotVariable() {
-    resolveTestUnit('''
-main() {
-  for (String item in ['a', 'b', 'c']) {
-    print(item);
-  }
-}
-''');
-    assertNoAssistAt('for (String', AssistKind.CONVERT_INTO_FOR_INDEX);
-  }
-
-  void test_convertToForIndex_BAD_iterableNotList() {
-    resolveTestUnit('''
-main(Iterable<String> items) {
-  for (String item in items) {
-    print(item);
-  }
-}
-''');
-    assertNoAssistAt('for (String', AssistKind.CONVERT_INTO_FOR_INDEX);
-  }
-
-  void test_convertToForIndex_BAD_usesIJK() {
-    resolveTestUnit('''
-main(List<String> items) {
-  for (String item in items) {
-    print(item);
-    int i, j, k;
-  }
-}
-''');
-    assertNoAssistAt('for (String', AssistKind.CONVERT_INTO_FOR_INDEX);
-  }
-
-  void test_convertToForIndex_OK_onDeclaredIdentifier_name() {
-    resolveTestUnit('''
-main(List<String> items) {
-  for (String item in items) {
-    print(item);
-  }
-}
-''');
-    assertHasAssistAt('item in', AssistKind.CONVERT_INTO_FOR_INDEX, '''
-main(List<String> items) {
-  for (int i = 0; i < items.length; i++) {
-    String item = items[i];
-    print(item);
-  }
-}
-''');
-  }
-
-  void test_convertToForIndex_OK_onDeclaredIdentifier_type() {
-    resolveTestUnit('''
-main(List<String> items) {
-  for (String item in items) {
-    print(item);
-  }
-}
-''');
-    assertHasAssistAt('tring item', AssistKind.CONVERT_INTO_FOR_INDEX, '''
-main(List<String> items) {
-  for (int i = 0; i < items.length; i++) {
-    String item = items[i];
-    print(item);
-  }
-}
-''');
-  }
-
-  void test_convertToForIndex_OK_onFor() {
-    resolveTestUnit('''
-main(List<String> items) {
-  for (String item in items) {
-    print(item);
-  }
-}
-''');
-    assertHasAssistAt('for (String', AssistKind.CONVERT_INTO_FOR_INDEX, '''
-main(List<String> items) {
-  for (int i = 0; i < items.length; i++) {
-    String item = items[i];
-    print(item);
-  }
-}
-''');
-  }
-
-  void test_convertToForIndex_OK_usesI() {
-    resolveTestUnit('''
-main(List<String> items) {
-  for (String item in items) {
-    int i = 0;
-  }
-}
-''');
-    assertHasAssistAt('for (String', AssistKind.CONVERT_INTO_FOR_INDEX, '''
-main(List<String> items) {
-  for (int j = 0; j < items.length; j++) {
-    String item = items[j];
-    int i = 0;
-  }
-}
-''');
-  }
-
-  void test_convertToForIndex_OK_usesIJ() {
-    resolveTestUnit('''
-main(List<String> items) {
-  for (String item in items) {
-    print(item);
-    int i = 0, j = 1;
-  }
-}
-''');
-    assertHasAssistAt('for (String', AssistKind.CONVERT_INTO_FOR_INDEX, '''
-main(List<String> items) {
-  for (int k = 0; k < items.length; k++) {
-    String item = items[k];
-    print(item);
-    int i = 0, j = 1;
-  }
-}
-''');
   }
 
   void test_convertToIsNot_OK_childOfIs_left() {
@@ -1367,7 +1142,8 @@ main() {
 ''');
   }
 
-  void test_exchangeBinaryExpressionArguments_OK_extended_sameOperator_afterFirst() {
+  void
+      test_exchangeBinaryExpressionArguments_OK_extended_sameOperator_afterFirst() {
     resolveTestUnit('''
 main() {
   1 + 2 + 3;
@@ -1380,7 +1156,8 @@ main() {
 ''');
   }
 
-  void test_exchangeBinaryExpressionArguments_OK_extended_sameOperator_afterSecond() {
+  void
+      test_exchangeBinaryExpressionArguments_OK_extended_sameOperator_afterSecond() {
     resolveTestUnit('''
 main() {
   1 + 2 + 3;
@@ -1576,7 +1353,7 @@ main(p) {
     assertNoAssistAt('if (p', AssistKind.INTRODUCE_LOCAL_CAST_TYPE);
   }
 
-  void test_introduceLocalTestedType_OK_if_is() {
+  void test_introduceLocalTestedType_OK_if() {
     resolveTestUnit('''
 class MyTypeName {}
 main(p) {
@@ -1595,39 +1372,15 @@ main(p) {
 }
 ''';
     assertHasAssistAt(
-        'is MyType', AssistKind.INTRODUCE_LOCAL_CAST_TYPE, expected);
-    _assertLinkedGroup(change.linkedEditGroups[0], [
-      'myTypeName = '
-    ], expectedSuggestions(
-        LinkedEditSuggestionKind.VARIABLE, ['myTypeName', 'typeName', 'name']));
-    // another good location
-    assertHasAssistAt('if (p', AssistKind.INTRODUCE_LOCAL_CAST_TYPE, expected);
-  }
-
-  void test_introduceLocalTestedType_OK_if_isNot() {
-    resolveTestUnit('''
-class MyTypeName {}
-main(p) {
-  if (p is! MyTypeName) {
-    return;
-  }
-}
-''');
-    String expected = '''
-class MyTypeName {}
-main(p) {
-  if (p is! MyTypeName) {
-    return;
-  }
-  MyTypeName myTypeName = p;
-}
-''';
-    assertHasAssistAt(
-        'is! MyType', AssistKind.INTRODUCE_LOCAL_CAST_TYPE, expected);
-    _assertLinkedGroup(change.linkedEditGroups[0], [
-      'myTypeName = '
-    ], expectedSuggestions(
-        LinkedEditSuggestionKind.VARIABLE, ['myTypeName', 'typeName', 'name']));
+        'is MyType',
+        AssistKind.INTRODUCE_LOCAL_CAST_TYPE,
+        expected);
+    _assertLinkedGroup(
+        change.linkedEditGroups[0],
+        ['myTypeName = '],
+        expectedSuggestions(
+            LinkedEditSuggestionKind.VARIABLE,
+            ['myTypeName', 'typeName', 'name']));
     // another good location
     assertHasAssistAt('if (p', AssistKind.INTRODUCE_LOCAL_CAST_TYPE, expected);
   }
@@ -1649,9 +1402,13 @@ main(p) {
 }
 ''';
     assertHasAssistAt(
-        'is String', AssistKind.INTRODUCE_LOCAL_CAST_TYPE, expected);
+        'is String',
+        AssistKind.INTRODUCE_LOCAL_CAST_TYPE,
+        expected);
     assertHasAssistAt(
-        'while (p', AssistKind.INTRODUCE_LOCAL_CAST_TYPE, expected);
+        'while (p',
+        AssistKind.INTRODUCE_LOCAL_CAST_TYPE,
+        expected);
   }
 
   void test_invalidSelection() {
@@ -2271,7 +2028,8 @@ main() {
     assertNoAssistAt('v;', AssistKind.JOIN_VARIABLE_DECLARATION);
   }
 
-  void test_joinVariableDeclaration_onDeclaration_wrong_nextNotAssignmentExpression() {
+  void
+      test_joinVariableDeclaration_onDeclaration_wrong_nextNotAssignmentExpression() {
     resolveTestUnit('''
 main() {
   var v;
@@ -2281,7 +2039,8 @@ main() {
     assertNoAssistAt('v;', AssistKind.JOIN_VARIABLE_DECLARATION);
   }
 
-  void test_joinVariableDeclaration_onDeclaration_wrong_nextNotExpressionStatement() {
+  void
+      test_joinVariableDeclaration_onDeclaration_wrong_nextNotExpressionStatement() {
     resolveTestUnit('''
 main() {
   var v;
@@ -2291,7 +2050,8 @@ main() {
     assertNoAssistAt('v;', AssistKind.JOIN_VARIABLE_DECLARATION);
   }
 
-  void test_joinVariableDeclaration_onDeclaration_wrong_nextNotPureAssignment() {
+  void
+      test_joinVariableDeclaration_onDeclaration_wrong_nextNotPureAssignment() {
     resolveTestUnit('''
 main() {
   var v;
@@ -2383,7 +2143,9 @@ main() {
   return true ? 111 : 222;
 }
 ''');
-    assertHasAssistAt('return ', AssistKind.REPLACE_CONDITIONAL_WITH_IF_ELSE,
+    assertHasAssistAt(
+        'return ',
+        AssistKind.REPLACE_CONDITIONAL_WITH_IF_ELSE,
         '''
 main() {
   if (true) {
@@ -2440,7 +2202,9 @@ main() {
   }
 }
 ''');
-    assertHasAssistAt('if (true)', AssistKind.REPLACE_IF_ELSE_WITH_CONDITIONAL,
+    assertHasAssistAt(
+        'if (true)',
+        AssistKind.REPLACE_IF_ELSE_WITH_CONDITIONAL,
         '''
 main() {
   int vvv;
@@ -2459,7 +2223,9 @@ main() {
   }
 }
 ''');
-    assertHasAssistAt('if (true)', AssistKind.REPLACE_IF_ELSE_WITH_CONDITIONAL,
+    assertHasAssistAt(
+        'if (true)',
+        AssistKind.REPLACE_IF_ELSE_WITH_CONDITIONAL,
         '''
 main() {
   return true ? 111 : 222;

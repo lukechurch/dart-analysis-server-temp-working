@@ -13,6 +13,7 @@ import 'package:analysis_server/src/channel/channel.dart';
 import 'package:analysis_server/src/protocol.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
 
+
 /**
  * Instances of the class [WebSocketClientChannel] implement a
  * [ClientCommunicationChannel] that uses a [WebSocket] to communicate with
@@ -34,19 +35,18 @@ class WebSocketClientChannel implements ClientCommunicationChannel {
    * Initialize a new [WebSocket] wrapper for the given [socket].
    */
   WebSocketClientChannel(this.socket) {
-    Stream jsonStream = socket
-        .where((data) => data is String)
-        .transform(new JsonStreamDecoder())
-        .where((json) => json is Map)
-        .asBroadcastStream();
-    responseStream = jsonStream
-        .where((json) => json[Notification.EVENT] == null)
-        .transform(new ResponseConverter())
-        .asBroadcastStream();
-    notificationStream = jsonStream
-        .where((json) => json[Notification.EVENT] != null)
-        .transform(new NotificationConverter())
-        .asBroadcastStream();
+    Stream jsonStream = socket.where(
+        (data) =>
+            data is String).transform(
+                new JsonStreamDecoder()).where((json) => json is Map).asBroadcastStream();
+    responseStream = jsonStream.where(
+        (json) =>
+            json[Notification.EVENT] ==
+                null).transform(new ResponseConverter()).asBroadcastStream();
+    notificationStream = jsonStream.where(
+        (json) =>
+            json[Notification.EVENT] !=
+                null).transform(new NotificationConverter()).asBroadcastStream();
   }
 
   @override
@@ -89,10 +89,12 @@ class WebSocketServerChannel implements ServerCommunicationChannel {
   }
 
   @override
-  void listen(void onRequest(Request request),
-      {void onError(), void onDone()}) {
-    socket.listen((data) => readRequest(data, onRequest),
-        onError: onError, onDone: onDone);
+  void listen(void onRequest(Request request), {void onError(), void
+      onDone()}) {
+    socket.listen(
+        (data) => readRequest(data, onRequest),
+        onError: onError,
+        onDone: onDone);
   }
 
   /**

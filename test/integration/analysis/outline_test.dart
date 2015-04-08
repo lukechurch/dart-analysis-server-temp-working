@@ -23,7 +23,8 @@ class Test extends AbstractAnalysisServerIntegrationTest {
    */
   void checkConnected(List<Outline> outlineObjects) {
     for (int i = 0; i < outlineObjects.length - 1; i++) {
-      expect(outlineObjects[i + 1].offset,
+      expect(
+          outlineObjects[i + 1].offset,
           equals(outlineObjects[i].offset + outlineObjects[i].length));
     }
   }
@@ -53,7 +54,9 @@ class Class2 {
 ''';
     writeFile(pathname, text);
     standardAnalysisSetup();
-    sendAnalysisSetSubscriptions({AnalysisService.OUTLINE: [pathname]});
+    sendAnalysisSetSubscriptions({
+      AnalysisService.OUTLINE: [pathname]
+    });
     Outline outline;
     onAnalysisOutline.listen((AnalysisOutlineParams params) {
       expect(params.file, equals(pathname));

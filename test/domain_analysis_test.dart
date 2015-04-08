@@ -20,11 +20,11 @@ import 'mock_sdk.dart';
 import 'mocks.dart';
 import 'reflective_tests.dart';
 
+
 main() {
   groupSep = ' | ';
 
   runReflectiveTests(AnalysisDomainTest);
-  runReflectiveTests(SetSubscriptionsTest);
 
   MockServerChannel serverChannel;
   MemoryResourceProvider resourceProvider;
@@ -34,20 +34,26 @@ main() {
   setUp(() {
     serverChannel = new MockServerChannel();
     resourceProvider = new MemoryResourceProvider();
-    server = new AnalysisServer(serverChannel, resourceProvider,
-        new MockPackageMapProvider(), null, new AnalysisServerOptions(),
-        new MockSdk(), InstrumentationService.NULL_SERVICE);
+    server = new AnalysisServer(
+        serverChannel,
+        resourceProvider,
+        new MockPackageMapProvider(),
+        null,
+        new AnalysisServerOptions(),
+        new MockSdk(),
+        InstrumentationService.NULL_SERVICE);
     handler = new AnalysisDomainHandler(server);
   });
 
   group('updateContent', testUpdateContent);
+  group('setSubscriptions', test_setSubscriptions);
 
   group('AnalysisDomainHandler', () {
     group('setAnalysisRoots', () {
-      Response testSetAnalysisRoots(
-          List<String> included, List<String> excluded) {
-        Request request = new AnalysisSetAnalysisRootsParams(included, excluded)
-            .toRequest('0');
+      Response testSetAnalysisRoots(List<String> included,
+          List<String> excluded) {
+        Request request =
+            new AnalysisSetAnalysisRootsParams(included, excluded).toRequest('0');
         return handler.handleRequest(request);
       }
 
@@ -90,8 +96,8 @@ main() {
       test('invalid', () {
         // TODO(paulberry): under the "eventual consistency" model this request
         // should not be invalid.
-        var request = new AnalysisSetPriorityFilesParams(['/project/lib.dart'])
-            .toRequest('0');
+        var request =
+            new AnalysisSetPriorityFilesParams(['/project/lib.dart']).toRequest('0');
         var response = handler.handleRequest(request);
         expect(response, isResponseFailure('0'));
       });
@@ -103,8 +109,8 @@ main() {
         resourceProvider.newFile('/p2/b.dart', 'library b;');
         resourceProvider.newFile('/p2/c.dart', 'library c;');
 
-        var setRootsRequest = new AnalysisSetAnalysisRootsParams(
-            ['/p1', '/p2'], []).toRequest('0');
+        var setRootsRequest =
+            new AnalysisSetAnalysisRootsParams(['/p1', '/p2'], []).toRequest('0');
         var setRootsResponse = handler.handleRequest(setRootsRequest);
         expect(setRootsResponse, isResponseSuccess('0'));
 
@@ -126,8 +132,11 @@ main() {
 
     group('updateOptions', () {
       test('invalid', () {
-        var request = new Request(
-            '0', ANALYSIS_UPDATE_OPTIONS, {OPTIONS: {'not-an-option': true}});
+        var request = new Request('0', ANALYSIS_UPDATE_OPTIONS, {
+          OPTIONS: {
+            'not-an-option': true
+          }
+        });
         var response = handler.handleRequest(request);
         // Invalid options should be silently ignored.
         expect(response, isResponseSuccess('0'));
@@ -135,8 +144,9 @@ main() {
 
       test('null', () {
         // null is allowed as a synonym for {}.
-        var request =
-            new Request('0', ANALYSIS_UPDATE_OPTIONS, {OPTIONS: null});
+        var request = new Request('0', ANALYSIS_UPDATE_OPTIONS, {
+          OPTIONS: null
+        });
         var response = handler.handleRequest(request);
         expect(response, isResponseSuccess('0'));
       });
@@ -144,13 +154,82 @@ main() {
   });
 }
 
+
+void test_setSubscriptions() {
+  test('before analysis', () {
+    AnalysisTestHelper helper = new AnalysisTestHelper();
+    // subscribe
+    helper.addAnalysisSubscriptionHighlights(helper.testFile);
+    // create project
+    helper.createSingleFileProject('int V = 42;');
+    // wait, there are highlight regions
+    helper.onAnalysisComplete.then((_) {
+      var highlights = helper.getHighlights(helper.testFile);
+      expect(highlights, isNotEmpty);
+    });
+  });
+
+  test('after analysis', () {
+    AnalysisTestHelper helper = new AnalysisTestHelper();
+    // create project
+    helper.createSingleFileProject('int V = 42;');
+    // wait, no regions initially
+    return helper.onAnalysisComplete.then((_) {
+      var highlights = helper.getHighlights(helper.testFile);
+      expect(highlights, isEmpty);
+      // subscribe
+      helper.addAnalysisSubscriptionHighlights(helper.testFile);
+      // wait, has regions
+      return helper.onAnalysisComplete.then((_) {
+        var highlights = helper.getHighlights(helper.testFile);
+        expect(highlights, isNotEmpty);
+      });
+    });
+  });
+
+  test('after analysis, no such file', () {
+    AnalysisTestHelper helper = new AnalysisTestHelper();
+    helper.createSingleFileProject('int V = 42;');
+    return helper.onAnalysisComplete.then((_) {
+      String noFile = '/no-such-file.dart';
+      helper.addAnalysisSubscriptionHighlights(noFile);
+      return helper.onAnalysisComplete.then((_) {
+        var highlights = helper.getHighlights(noFile);
+        expect(highlights, isEmpty);
+      });
+    });
+  });
+
+  test('after analysis, SDK file', () {
+    AnalysisTestHelper helper = new AnalysisTestHelper();
+    helper.createSingleFileProject('''
+main() {
+  print(42);
+}
+''');
+    return helper.onAnalysisComplete.then((_) {
+      String file = '/lib/core/core.dart';
+      helper.addAnalysisSubscriptionNavigation(file);
+      return helper.onAnalysisComplete.then((_) {
+        var navigationRegions = helper.getNavigation(file);
+        expect(navigationRegions, isNotEmpty);
+      });
+    });
+  });
+}
+
+
 testUpdateContent() {
   test('bad type', () {
     AnalysisTestHelper helper = new AnalysisTestHelper();
     helper.createSingleFileProject('// empty');
     return helper.onAnalysisComplete.then((_) {
       Request request = new Request('0', ANALYSIS_UPDATE_CONTENT, {
-        'files': {helper.testFile: {TYPE: 'foo',}}
+        'files': {
+          helper.testFile: {
+            TYPE: 'foo',
+          }
+        }
       });
       Response response = helper.handler.handleRequest(request);
       expect(response, isResponseFailure('0'));
@@ -185,8 +264,9 @@ testUpdateContent() {
       // Add the file to the cache
       helper.sendContentChange(new AddContentOverlay(initialContent));
       // update code
-      helper.sendContentChange(new ChangeContentOverlay(
-          [new SourceEdit('library '.length, 'A;'.length, 'lib')]));
+      helper.sendContentChange(
+          new ChangeContentOverlay(
+              [new SourceEdit('library '.length, 'A;'.length, 'lib')]));
       // wait, there is an error
       return helper.onAnalysisComplete.then((_) {
         List<AnalysisError> errors = helper.getTestErrors();
@@ -246,11 +326,12 @@ testUpdateContent() {
         helper.sendContentChange(new AddContentOverlay('library B;'));
         return helper.onAnalysisComplete.then((_) {
           ChangeContentOverlay contentChange = new ChangeContentOverlay([edit]);
-          Request request =
-              new AnalysisUpdateContentParams({helper.testFile: contentChange})
-                  .toRequest('0');
+          Request request = new AnalysisUpdateContentParams({
+            helper.testFile: contentChange
+          }).toRequest('0');
           Response response = helper.handler.handleRequest(request);
-          expect(response,
+          expect(
+              response,
               isResponseFailure('0', RequestErrorCode.INVALID_OVERLAY_CHANGE));
         });
       });
@@ -269,6 +350,7 @@ testUpdateContent() {
     });
   });
 }
+
 
 @reflectiveTest
 class AnalysisDomainTest extends AbstractAnalysisTest {
@@ -321,9 +403,8 @@ f(A a) {
 library lib_a;
 class A {}
 ''');
-    packageMapProvider.packageMap['pkgA'] = [
-      resourceProvider.getResource('/packages/pkgA')
-    ];
+    packageMapProvider.packageMap['pkgA'] =
+        [resourceProvider.getResource('/packages/pkgA')];
     addTestFile('''
 import 'package:pkgA/libA.dart';
 main(A a) {
@@ -339,6 +420,7 @@ main(A a) {
     });
   }
 }
+
 
 /**
  * A helper to test 'analysis.*' requests.
@@ -361,9 +443,14 @@ class AnalysisTestHelper {
   AnalysisTestHelper() {
     serverChannel = new MockServerChannel();
     resourceProvider = new MemoryResourceProvider();
-    server = new AnalysisServer(serverChannel, resourceProvider,
-        new MockPackageMapProvider(), null, new AnalysisServerOptions(),
-        new MockSdk(), InstrumentationService.NULL_SERVICE);
+    server = new AnalysisServer(
+        serverChannel,
+        resourceProvider,
+        new MockPackageMapProvider(),
+        null,
+        new AnalysisServerOptions(),
+        new MockSdk(),
+        InstrumentationService.NULL_SERVICE);
     handler = new AnalysisDomainHandler(server);
     // listen for notifications
     Stream<Notification> notificationStream =
@@ -402,8 +489,8 @@ class AnalysisTestHelper {
     }
     files.add(file);
     // set subscriptions
-    Request request = new AnalysisSetSubscriptionsParams(analysisSubscriptions)
-        .toRequest('0');
+    Request request =
+        new AnalysisSetSubscriptionsParams(analysisSubscriptions).toRequest('0');
     handleSuccessfulRequest(request);
   }
 
@@ -520,8 +607,9 @@ class AnalysisTestHelper {
    * Send an `updateContent` request for [testFile].
    */
   void sendContentChange(dynamic contentChange) {
-    Request request = new AnalysisUpdateContentParams({testFile: contentChange})
-        .toRequest('0');
+    Request request = new AnalysisUpdateContentParams({
+      testFile: contentChange
+    }).toRequest('0');
     handleSuccessfulRequest(request);
   }
 
@@ -542,132 +630,5 @@ class AnalysisTestHelper {
       code = code.join('\n');
     }
     return code as String;
-  }
-}
-
-@reflectiveTest
-class SetSubscriptionsTest extends AbstractAnalysisTest {
-  Map<String, List<HighlightRegion>> filesHighlights = {};
-
-  void processNotification(Notification notification) {
-    if (notification.event == ANALYSIS_HIGHLIGHTS) {
-      var params = new AnalysisHighlightsParams.fromNotification(notification);
-      filesHighlights[params.file] = params.regions;
-    }
-  }
-
-  test_afterAnalysis() async {
-    addTestFile('int V = 42;');
-    createProject();
-    // wait for analysis, no results initially
-    await waitForTasksFinished();
-    expect(filesHighlights[testFile], isNull);
-    // subscribe
-    addAnalysisSubscription(AnalysisService.HIGHLIGHTS, testFile);
-    await server.onAnalysisComplete;
-    // there are results
-    expect(filesHighlights[testFile], isNotEmpty);
-  }
-
-  test_afterAnalysis_noSuchFile() async {
-    String file = '/no-such-file.dart';
-    addTestFile('// no matter');
-    createProject();
-    // wait for analysis, no results initially
-    await waitForTasksFinished();
-    expect(filesHighlights[testFile], isNull);
-    // subscribe
-    addAnalysisSubscription(AnalysisService.HIGHLIGHTS, file);
-    await server.onAnalysisComplete;
-    // there are results
-    expect(filesHighlights[file], isNull);
-  }
-
-  test_afterAnalysis_packageFile_external() async {
-    String pkgFile = '/packages/pkgA/lib/libA.dart';
-    resourceProvider.newFile(pkgFile, '''
-library lib_a;
-class A {}
-''');
-    packageMapProvider.packageMap = {
-      'pkgA': [(resourceProvider.newFolder('/packages/pkgA/lib'))]
-    };
-    //
-    addTestFile('''
-import 'package:pkgA/libA.dart';
-main() {
-  new A();
-}
-''');
-    createProject();
-    // wait for analysis, no results initially
-    await waitForTasksFinished();
-    expect(filesHighlights[pkgFile], isNull);
-    // subscribe
-    addAnalysisSubscription(AnalysisService.HIGHLIGHTS, pkgFile);
-    await server.onAnalysisComplete;
-    // there are results
-    expect(filesHighlights[pkgFile], isNotEmpty);
-  }
-
-  test_afterAnalysis_packageFile_inRoot() async {
-    String pkgA = '/pkgA';
-    String pkgB = '/pkgA';
-    String pkgFileA = '$pkgA/lib/libA.dart';
-    String pkgFileB = '$pkgA/lib/libB.dart';
-    resourceProvider.newFile(pkgFileA, '''
-library lib_a;
-class A {}
-''');
-    resourceProvider.newFile(pkgFileB, '''
-import 'package:pkgA/libA.dart';
-main() {
-  new A();
-}
-''');
-    packageMapProvider.packageMap = {
-      'pkgA': [
-        resourceProvider.newFolder('$pkgA/lib'),
-        resourceProvider.newFolder('$pkgB/lib')
-      ]
-    };
-    // add 'pkgA' and 'pkgB' as projects
-    {
-      resourceProvider.newFolder(projectPath);
-      handleSuccessfulRequest(
-          new AnalysisSetAnalysisRootsParams([pkgA, pkgB], []).toRequest('0'));
-    }
-    // wait for analysis, no results initially
-    await waitForTasksFinished();
-    expect(filesHighlights[pkgFileA], isNull);
-    // subscribe
-    addAnalysisSubscription(AnalysisService.HIGHLIGHTS, pkgFileA);
-    await server.onAnalysisComplete;
-    // there are results
-    expect(filesHighlights[pkgFileA], isNotEmpty);
-  }
-
-  test_afterAnalysis_sdkFile() async {
-    String file = '/lib/core/core.dart';
-    addTestFile('// no matter');
-    createProject();
-    // wait for analysis, no results initially
-    await waitForTasksFinished();
-    expect(filesHighlights[file], isNull);
-    // subscribe
-    addAnalysisSubscription(AnalysisService.HIGHLIGHTS, file);
-    await server.onAnalysisComplete;
-    // there are results
-    expect(filesHighlights[file], isNotEmpty);
-  }
-
-  test_beforeAnalysis() async {
-    addTestFile('int V = 42;');
-    createProject();
-    // subscribe
-    addAnalysisSubscription(AnalysisService.HIGHLIGHTS, testFile);
-    // wait for analysis
-    await waitForTasksFinished();
-    expect(filesHighlights[testFile], isNotEmpty);
   }
 }

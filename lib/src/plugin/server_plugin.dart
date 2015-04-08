@@ -4,6 +4,7 @@
 
 library analysis_server.src.plugin.server_plugin;
 
+import 'package:analysis_server/plugin/plugin.dart';
 import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/domain_analysis.dart';
 import 'package:analysis_server/src/domain_completion.dart';
@@ -12,11 +13,12 @@ import 'package:analysis_server/src/domain_server.dart';
 import 'package:analysis_server/src/edit/edit_domain.dart';
 import 'package:analysis_server/src/protocol.dart';
 import 'package:analysis_server/src/search/search_domain.dart';
-import 'package:analyzer/plugin/plugin.dart';
 
 /**
  * A function that will create a request handler that can be used by the given
  * [server].
+ *
+ * TODO(brianwilkerson) Move this into 'protocol.dart'.
  */
 typedef RequestHandler RequestHandlerFactory(AnalysisServer server);
 
@@ -58,31 +60,36 @@ class ServerPlugin implements Plugin {
     if (domainExtensionPoint == null) {
       return <RequestHandler>[];
     }
-    return domainExtensionPoint.extensions
-        .map((RequestHandlerFactory factory) => factory(server))
-        .toList();
+    return domainExtensionPoint.extensions.map(
+        (RequestHandlerFactory factory) => factory(server)).toList();
   }
 
   @override
   void registerExtensionPoints(RegisterExtensionPoint registerExtensionPoint) {
-    domainExtensionPoint = registerExtensionPoint(
-        DOMAIN_EXTENSION_POINT, _validateDomainExtension);
+    domainExtensionPoint =
+        registerExtensionPoint(DOMAIN_EXTENSION_POINT, _validateDomainExtension);
   }
 
   @override
   void registerExtensions(RegisterExtension registerExtension) {
     String domainId = Plugin.join(UNIQUE_IDENTIFIER, DOMAIN_EXTENSION_POINT);
     registerExtension(
-        domainId, (AnalysisServer server) => new ServerDomainHandler(server));
+        domainId,
+        (AnalysisServer server) => new ServerDomainHandler(server));
     registerExtension(
-        domainId, (AnalysisServer server) => new AnalysisDomainHandler(server));
+        domainId,
+        (AnalysisServer server) => new AnalysisDomainHandler(server));
     registerExtension(
-        domainId, (AnalysisServer server) => new EditDomainHandler(server));
+        domainId,
+        (AnalysisServer server) => new EditDomainHandler(server));
     registerExtension(
-        domainId, (AnalysisServer server) => new SearchDomainHandler(server));
-    registerExtension(domainId,
+        domainId,
+        (AnalysisServer server) => new SearchDomainHandler(server));
+    registerExtension(
+        domainId,
         (AnalysisServer server) => new CompletionDomainHandler(server));
-    registerExtension(domainId,
+    registerExtension(
+        domainId,
         (AnalysisServer server) => new ExecutionDomainHandler(server));
   }
 

@@ -14,12 +14,13 @@ import 'package:analysis_server/src/services/refactoring/rename.dart';
 import 'package:analysis_server/src/services/search/search_engine.dart';
 import 'package:analyzer/src/generated/element.dart';
 
+
 /**
  * A [Refactoring] for renaming [LibraryElement]s.
  */
 class RenameLibraryRefactoringImpl extends RenameRefactoringImpl {
-  RenameLibraryRefactoringImpl(
-      SearchEngine searchEngine, LibraryElement element)
+  RenameLibraryRefactoringImpl(SearchEngine searchEngine,
+      LibraryElement element)
       : super(searchEngine, element);
 
   @override

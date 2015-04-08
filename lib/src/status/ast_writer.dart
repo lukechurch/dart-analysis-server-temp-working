@@ -161,9 +161,6 @@ class AstWriter extends UnifyingAstVisitor with TreeWriter {
     buffer.write('..');
     buffer.write(node.offset + node.length - 1);
     buffer.write(']</span>');
-    if (node.isSynthetic) {
-      buffer.write(' (synthetic)');
-    }
     buffer.write('<br>');
   }
 }

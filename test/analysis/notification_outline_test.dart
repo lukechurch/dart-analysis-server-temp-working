@@ -13,9 +13,11 @@ import 'package:unittest/unittest.dart';
 import '../analysis_abstract.dart';
 import '../reflective_tests.dart';
 
+
 main() {
   runReflectiveTests(_AnalysisNotificationOutlineTest);
 }
+
 
 @reflectiveTest
 class _AnalysisNotificationOutlineTest extends AbstractAnalysisTest {
@@ -60,7 +62,7 @@ class BBB {
 
   test_class() {
     addTestFile('''
-class A<K, V> {
+class A {
   int fa, fb;
   String fc;
   A(int i, String s);
@@ -85,10 +87,9 @@ class B {
         Element element_A = outline_A.element;
         expect(element_A.kind, ElementKind.CLASS);
         expect(element_A.name, "A");
-        expect(element_A.typeParameters, "<K, V>");
         {
           Location location = element_A.location;
-          expect(location.offset, testCode.indexOf("A<K, V> {"));
+          expect(location.offset, testCode.indexOf("A {"));
           expect(location.length, 1);
         }
         expect(element_A.parameters, null);
@@ -228,7 +229,6 @@ class B {
         Element element_B = outline_B.element;
         expect(element_B.kind, ElementKind.CLASS);
         expect(element_B.name, "B");
-        expect(element_B.typeParameters, isNull);
         {
           Location location = element_B.location;
           expect(location.offset, testCode.indexOf("B {"));
@@ -679,12 +679,11 @@ int fieldD; // marker2
 
   test_topLevel() {
     addTestFile('''
-typedef String FTA<K, V>(int i, String s);
+typedef String FTA(int i, String s);
 typedef FTB(int p);
-class A<T> {}
+class A {}
 class B {}
-class CTA<T> = A<T> with B;
-class CTB = A with B;
+class CTA = A with B;
 String fA(int i, String s) => null;
 fB(int p) => null;
 String get propA => null;
@@ -693,17 +692,16 @@ set propB(int v) {}
     return prepareOutline().then((_) {
       Outline unitOutline = outline;
       List<Outline> topOutlines = unitOutline.children;
-      expect(topOutlines, hasLength(10));
+      expect(topOutlines, hasLength(9));
       // FTA
       {
         Outline outline = topOutlines[0];
         Element element = outline.element;
         expect(element.kind, ElementKind.FUNCTION_TYPE_ALIAS);
         expect(element.name, "FTA");
-        expect(element.typeParameters, "<K, V>");
         {
           Location location = element.location;
-          expect(location.offset, testCode.indexOf("FTA<K, V>("));
+          expect(location.offset, testCode.indexOf("FTA("));
           expect(location.length, "FTA".length);
         }
         expect(element.parameters, "(int i, String s)");
@@ -715,7 +713,6 @@ set propB(int v) {}
         Element element = outline.element;
         expect(element.kind, ElementKind.FUNCTION_TYPE_ALIAS);
         expect(element.name, "FTB");
-        expect(element.typeParameters, isNull);
         {
           Location location = element.location;
           expect(location.offset, testCode.indexOf("FTB("));
@@ -730,27 +727,17 @@ set propB(int v) {}
         Element element = outline.element;
         expect(element.kind, ElementKind.CLASS_TYPE_ALIAS);
         expect(element.name, "CTA");
-        expect(element.typeParameters, '<T>');
         {
           Location location = element.location;
-          expect(location.offset, testCode.indexOf("CTA<T> ="));
+          expect(location.offset, testCode.indexOf("CTA ="));
           expect(location.length, "CTA".length);
         }
         expect(element.parameters, isNull);
         expect(element.returnType, isNull);
       }
-      // CTB
-      {
-        Outline outline = topOutlines[5];
-        Element element = outline.element;
-        expect(element.kind, ElementKind.CLASS_TYPE_ALIAS);
-        expect(element.name, 'CTB');
-        expect(element.typeParameters, isNull);
-        expect(element.returnType, isNull);
-      }
       // fA
       {
-        Outline outline = topOutlines[6];
+        Outline outline = topOutlines[5];
         Element element = outline.element;
         expect(element.kind, ElementKind.FUNCTION);
         expect(element.name, "fA");
@@ -764,7 +751,7 @@ set propB(int v) {}
       }
       // fB
       {
-        Outline outline = topOutlines[7];
+        Outline outline = topOutlines[6];
         Element element = outline.element;
         expect(element.kind, ElementKind.FUNCTION);
         expect(element.name, "fB");
@@ -778,7 +765,7 @@ set propB(int v) {}
       }
       // propA
       {
-        Outline outline = topOutlines[8];
+        Outline outline = topOutlines[7];
         Element element = outline.element;
         expect(element.kind, ElementKind.GETTER);
         expect(element.name, "propA");
@@ -792,7 +779,7 @@ set propB(int v) {}
       }
       // propB
       {
-        Outline outline = topOutlines[9];
+        Outline outline = topOutlines[8];
         Element element = outline.element;
         expect(element.kind, ElementKind.SETTER);
         expect(element.name, "propB");

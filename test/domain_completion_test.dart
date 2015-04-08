@@ -46,9 +46,14 @@ class CompletionManagerTest extends AbstractAnalysisTest {
   String testFile2 = '/project/bin/test2.dart';
 
   AnalysisServer createAnalysisServer(Index index) {
-    return new Test_AnalysisServer(super.serverChannel, super.resourceProvider,
-        super.packageMapProvider, index, new AnalysisServerOptions(),
-        new MockSdk(), InstrumentationService.NULL_SERVICE);
+    return new Test_AnalysisServer(
+        super.serverChannel,
+        super.resourceProvider,
+        super.packageMapProvider,
+        index,
+        new AnalysisServerOptions(),
+        new MockSdk(),
+        InstrumentationService.NULL_SERVICE);
   }
 
   @override
@@ -192,9 +197,8 @@ class CompletionManagerTest extends AbstractAnalysisTest {
     sendRequest(testFile);
     return pumpEventQueue().then((_) {
       expect(completionDomain.manager, isNotNull);
-      ContextSourcePair contextSource = server.getContextSourcePair(testFile2);
       ChangeSet changeSet = new ChangeSet();
-      changeSet.changedSource(contextSource.source);
+      changeSet.changedSource(server.getSource(testFile2));
       completionDomain.sourcesChanged(new SourcesChangedEvent(changeSet));
       expect(completionDomain.manager, isNull);
     });
@@ -253,18 +257,14 @@ class CompletionTest extends AbstractAnalysisTest {
   List<CompletionSuggestion> suggestions = [];
   bool suggestionsDone = false;
 
-  String addTestFile(String content, {offset}) {
+  String addTestFile(String content) {
     completionOffset = content.indexOf('^');
-    if (offset != null) {
-      expect(completionOffset, -1, reason: 'cannot supply offset and ^');
-      completionOffset = offset;
-      return super.addTestFile(content);
-    }
     expect(completionOffset, isNot(equals(-1)), reason: 'missing ^');
     int nextOffset = content.indexOf('^', completionOffset + 1);
     expect(nextOffset, equals(-1), reason: 'too many ^');
-    return super.addTestFile(content.substring(0, completionOffset) +
-        content.substring(completionOffset + 1));
+    return super.addTestFile(
+        content.substring(0, completionOffset) +
+            content.substring(completionOffset + 1));
   }
 
   void assertHasResult(CompletionSuggestionKind kind, String completion,
@@ -310,8 +310,8 @@ class CompletionTest extends AbstractAnalysisTest {
 
   Future getSuggestions() {
     return waitForTasksFinished().then((_) {
-      Request request = new CompletionGetSuggestionsParams(
-          testFile, completionOffset).toRequest('0');
+      Request request =
+          new CompletionGetSuggestionsParams(testFile, completionOffset).toRequest('0');
       Response response = handleSuccessfulRequest(request);
       completionId = response.id;
       assertValidId(completionId);
@@ -409,9 +409,13 @@ class CompletionTest extends AbstractAnalysisTest {
       expect(replacementOffset, equals(completionOffset - 2));
       expect(replacementLength, equals(2));
       assertHasResult(
-          CompletionSuggestionKind.KEYWORD, 'import', DART_RELEVANCE_HIGH);
+          CompletionSuggestionKind.KEYWORD,
+          'import',
+          DART_RELEVANCE_HIGH);
       assertHasResult(
-          CompletionSuggestionKind.KEYWORD, 'class', DART_RELEVANCE_HIGH);
+          CompletionSuggestionKind.KEYWORD,
+          'class',
+          DART_RELEVANCE_HIGH);
     });
   }
 
@@ -426,41 +430,22 @@ class CompletionTest extends AbstractAnalysisTest {
   }
 
   test_locals() {
-    addTestFile('class A {var a; x() {var b;^}} class DateTime { }');
+    addTestFile('class A {var a; x() {var b;^}}');
     return getSuggestions().then((_) {
       expect(replacementOffset, equals(completionOffset));
       expect(replacementLength, equals(0));
       assertHasResult(CompletionSuggestionKind.INVOCATION, 'A');
       assertHasResult(
-          CompletionSuggestionKind.INVOCATION, 'a', DART_RELEVANCE_LOCAL_FIELD);
-      assertHasResult(CompletionSuggestionKind.INVOCATION, 'b',
+          CompletionSuggestionKind.INVOCATION,
+          'a',
+          DART_RELEVANCE_LOCAL_FIELD);
+      assertHasResult(
+          CompletionSuggestionKind.INVOCATION,
+          'b',
           DART_RELEVANCE_LOCAL_VARIABLE);
-      assertHasResult(CompletionSuggestionKind.INVOCATION, 'x',
-          DART_RELEVANCE_LOCAL_METHOD);
-      assertHasResult(CompletionSuggestionKind.INVOCATION, 'DateTime');
-    });
-  }
-
-  test_offset_past_eof() {
-    addTestFile('main() { }', offset: 300);
-    return getSuggestions().then((_) {
-      expect(replacementOffset, equals(300));
-      expect(replacementLength, equals(0));
-      expect(suggestionsDone, true);
-      expect(suggestions.length, 0);
-    });
-  }
-
-  test_overrides() {
-    addFile('/libA.dart', 'class A {m() {}}');
-    addTestFile('''
-import '/libA.dart';
-class B extends A {m() {^}}
-''');
-    return getSuggestions().then((_) {
-      expect(replacementOffset, equals(completionOffset));
-      expect(replacementLength, equals(0));
-      assertHasResult(CompletionSuggestionKind.INVOCATION, 'm',
+      assertHasResult(
+          CompletionSuggestionKind.INVOCATION,
+          'x',
           DART_RELEVANCE_LOCAL_METHOD);
     });
   }
@@ -531,7 +516,9 @@ class B extends A {m() {^}}
       expect(replacementLength, equals(4));
       // Suggestions based upon imported elements are partially filtered
       //assertHasResult(CompletionSuggestionKind.INVOCATION, 'Object');
-      assertHasResult(CompletionSuggestionKind.INVOCATION, 'test',
+      assertHasResult(
+          CompletionSuggestionKind.INVOCATION,
+          'test',
           DART_RELEVANCE_LOCAL_TOP_LEVEL_VARIABLE);
       assertNoResult('HtmlElement');
     });
@@ -615,8 +602,8 @@ class MockStream<E> implements Stream<E> {
   int get cancelCount => mockSubscription.cancelCount;
 
   @override
-  StreamSubscription<E> listen(void onData(E event),
-      {Function onError, void onDone(), bool cancelOnError}) {
+  StreamSubscription<E> listen(void onData(E event), {Function onError, void
+      onDone(), bool cancelOnError}) {
     ++listenCount;
     return mockSubscription;
   }
@@ -643,20 +630,19 @@ class Test_AnalysisServer extends AnalysisServer {
 
   Test_AnalysisServer(ServerCommunicationChannel channel,
       ResourceProvider resourceProvider, PackageMapProvider packageMapProvider,
-      Index index, AnalysisServerOptions analysisServerOptions,
-      DartSdk defaultSdk, InstrumentationService instrumentationService)
-      : super(channel, resourceProvider, packageMapProvider, index,
-          analysisServerOptions, defaultSdk, instrumentationService);
+      Index index, AnalysisServerOptions analysisServerOptions, DartSdk defaultSdk,
+      InstrumentationService instrumentationService)
+      : super(
+          channel,
+          resourceProvider,
+          packageMapProvider,
+          index,
+          analysisServerOptions,
+          defaultSdk,
+          instrumentationService);
 
-  @override
   AnalysisContext getAnalysisContext(String path) {
     return mockContext;
-  }
-
-  @override
-  ContextSourcePair getContextSourcePair(String path) {
-    ContextSourcePair pair = super.getContextSourcePair(path);
-    return new ContextSourcePair(mockContext, pair.source);
   }
 }
 
@@ -665,6 +651,7 @@ class Test_AnalysisServer extends AnalysisServer {
  * so that the domain handler cache management can be tested.
  */
 class Test_CompletionDomainHandler extends CompletionDomainHandler {
+
   Test_CompletionDomainHandler(Test_AnalysisServer server) : super(server);
 
   MockContext get mockContext => (server as Test_AnalysisServer).mockContext;
@@ -672,18 +659,19 @@ class Test_CompletionDomainHandler extends CompletionDomainHandler {
   MockCompletionManager get mockManager => manager;
 
   void contextsChanged(ContextsChangedEvent event) {
-    contextsChangedRaw(new ContextsChangedEvent(
-        added: event.added.length > 0 ? [mockContext] : [],
-        changed: event.changed.length > 0 ? [mockContext] : [],
-        removed: event.removed.length > 0 ? [mockContext] : []));
+    contextsChangedRaw(
+        new ContextsChangedEvent(
+            added: event.added.length > 0 ? [mockContext] : [],
+            changed: event.changed.length > 0 ? [mockContext] : [],
+            removed: event.removed.length > 0 ? [mockContext] : []));
   }
 
   void contextsChangedRaw(ContextsChangedEvent newEvent) {
     super.contextsChanged(newEvent);
   }
 
-  CompletionManager createCompletionManager(
-      AnalysisContext context, Source source, SearchEngine searchEngine) {
+  CompletionManager createCompletionManager(AnalysisContext context,
+      Source source, SearchEngine searchEngine) {
     return new MockCompletionManager(mockContext, source, searchEngine);
   }
 }

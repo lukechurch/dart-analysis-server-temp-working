@@ -6432,7 +6432,6 @@ class CompletionSuggestionKind implements Enum {
  *   "flags": int
  *   "parameters": optional String
  *   "returnType": optional String
- *   "typeParameters": optional String
  * }
  */
 class Element implements HasToJson {
@@ -6498,13 +6497,7 @@ class Element implements HasToJson {
    */
   String returnType;
 
-  /**
-   * The type parameter list for the element. If the element doesn't have type
-   * parameters, this field will not be defined.
-   */
-  String typeParameters;
-
-  Element(this.kind, this.name, this.flags, {this.location, this.parameters, this.returnType, this.typeParameters});
+  Element(this.kind, this.name, this.flags, {this.location, this.parameters, this.returnType});
 
   factory Element.fromJson(JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json == null) {
@@ -6541,11 +6534,7 @@ class Element implements HasToJson {
       if (json.containsKey("returnType")) {
         returnType = jsonDecoder._decodeString(jsonPath + ".returnType", json["returnType"]);
       }
-      String typeParameters;
-      if (json.containsKey("typeParameters")) {
-        typeParameters = jsonDecoder._decodeString(jsonPath + ".typeParameters", json["typeParameters"]);
-      }
-      return new Element(kind, name, flags, location: location, parameters: parameters, returnType: returnType, typeParameters: typeParameters);
+      return new Element(kind, name, flags, location: location, parameters: parameters, returnType: returnType);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "Element");
     }
@@ -6572,9 +6561,6 @@ class Element implements HasToJson {
     if (returnType != null) {
       result["returnType"] = returnType;
     }
-    if (typeParameters != null) {
-      result["typeParameters"] = typeParameters;
-    }
     return result;
   }
 
@@ -6589,8 +6575,7 @@ class Element implements HasToJson {
           location == other.location &&
           flags == other.flags &&
           parameters == other.parameters &&
-          returnType == other.returnType &&
-          typeParameters == other.typeParameters;
+          returnType == other.returnType;
     }
     return false;
   }
@@ -6604,7 +6589,6 @@ class Element implements HasToJson {
     hash = _JenkinsSmiHash.combine(hash, flags.hashCode);
     hash = _JenkinsSmiHash.combine(hash, parameters.hashCode);
     hash = _JenkinsSmiHash.combine(hash, returnType.hashCode);
-    hash = _JenkinsSmiHash.combine(hash, typeParameters.hashCode);
     return _JenkinsSmiHash.finish(hash);
   }
 }
@@ -7408,7 +7392,6 @@ class HighlightRegionType implements Enum {
  *   "length": int
  *   "containingLibraryPath": optional String
  *   "containingLibraryName": optional String
- *   "containingClassDescription": optional String
  *   "dartdoc": optional String
  *   "elementDescription": optional String
  *   "elementKind": optional String
@@ -7443,13 +7426,6 @@ class HoverInformation implements HasToJson {
    * declared inside an HTML file.
    */
   String containingLibraryName;
-
-  /**
-   * A human-readable description of the class declaring the element being
-   * referenced. This data is omitted if there is no referenced element, or if
-   * the element is not a class member.
-   */
-  String containingClassDescription;
 
   /**
    * The dartdoc associated with the referenced element. Other than the removal
@@ -7492,7 +7468,7 @@ class HoverInformation implements HasToJson {
    */
   String staticType;
 
-  HoverInformation(this.offset, this.length, {this.containingLibraryPath, this.containingLibraryName, this.containingClassDescription, this.dartdoc, this.elementDescription, this.elementKind, this.parameter, this.propagatedType, this.staticType});
+  HoverInformation(this.offset, this.length, {this.containingLibraryPath, this.containingLibraryName, this.dartdoc, this.elementDescription, this.elementKind, this.parameter, this.propagatedType, this.staticType});
 
   factory HoverInformation.fromJson(JsonDecoder jsonDecoder, String jsonPath, Object json) {
     if (json == null) {
@@ -7519,10 +7495,6 @@ class HoverInformation implements HasToJson {
       if (json.containsKey("containingLibraryName")) {
         containingLibraryName = jsonDecoder._decodeString(jsonPath + ".containingLibraryName", json["containingLibraryName"]);
       }
-      String containingClassDescription;
-      if (json.containsKey("containingClassDescription")) {
-        containingClassDescription = jsonDecoder._decodeString(jsonPath + ".containingClassDescription", json["containingClassDescription"]);
-      }
       String dartdoc;
       if (json.containsKey("dartdoc")) {
         dartdoc = jsonDecoder._decodeString(jsonPath + ".dartdoc", json["dartdoc"]);
@@ -7547,7 +7519,7 @@ class HoverInformation implements HasToJson {
       if (json.containsKey("staticType")) {
         staticType = jsonDecoder._decodeString(jsonPath + ".staticType", json["staticType"]);
       }
-      return new HoverInformation(offset, length, containingLibraryPath: containingLibraryPath, containingLibraryName: containingLibraryName, containingClassDescription: containingClassDescription, dartdoc: dartdoc, elementDescription: elementDescription, elementKind: elementKind, parameter: parameter, propagatedType: propagatedType, staticType: staticType);
+      return new HoverInformation(offset, length, containingLibraryPath: containingLibraryPath, containingLibraryName: containingLibraryName, dartdoc: dartdoc, elementDescription: elementDescription, elementKind: elementKind, parameter: parameter, propagatedType: propagatedType, staticType: staticType);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "HoverInformation");
     }
@@ -7562,9 +7534,6 @@ class HoverInformation implements HasToJson {
     }
     if (containingLibraryName != null) {
       result["containingLibraryName"] = containingLibraryName;
-    }
-    if (containingClassDescription != null) {
-      result["containingClassDescription"] = containingClassDescription;
     }
     if (dartdoc != null) {
       result["dartdoc"] = dartdoc;
@@ -7597,7 +7566,6 @@ class HoverInformation implements HasToJson {
           length == other.length &&
           containingLibraryPath == other.containingLibraryPath &&
           containingLibraryName == other.containingLibraryName &&
-          containingClassDescription == other.containingClassDescription &&
           dartdoc == other.dartdoc &&
           elementDescription == other.elementDescription &&
           elementKind == other.elementKind &&
@@ -7615,7 +7583,6 @@ class HoverInformation implements HasToJson {
     hash = _JenkinsSmiHash.combine(hash, length.hashCode);
     hash = _JenkinsSmiHash.combine(hash, containingLibraryPath.hashCode);
     hash = _JenkinsSmiHash.combine(hash, containingLibraryName.hashCode);
-    hash = _JenkinsSmiHash.combine(hash, containingClassDescription.hashCode);
     hash = _JenkinsSmiHash.combine(hash, dartdoc.hashCode);
     hash = _JenkinsSmiHash.combine(hash, elementDescription.hashCode);
     hash = _JenkinsSmiHash.combine(hash, elementKind.hashCode);
@@ -10571,8 +10538,7 @@ class ExtractMethodFeedback extends RefactoringFeedback implements HasToJson {
   int length;
 
   /**
-   * The proposed return type for the method. If the returned element does not
-   * have a declared return type, this field will contain an empty string.
+   * The proposed return type for the method.
    */
   String returnType;
 

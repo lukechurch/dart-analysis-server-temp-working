@@ -13,6 +13,7 @@ import 'package:unittest/unittest.dart';
 
 import 'abstract_refactoring.dart';
 
+
 /**
  * The base class for all [RenameRefactoring] tests.
  */

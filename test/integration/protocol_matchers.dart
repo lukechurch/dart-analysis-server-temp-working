@@ -1178,7 +1178,6 @@ final Matcher isCompletionSuggestionKind = new MatchesEnum("CompletionSuggestion
  *   "flags": int
  *   "parameters": optional String
  *   "returnType": optional String
- *   "typeParameters": optional String
  * }
  */
 final Matcher isElement = new LazyMatcher(() => new MatchesJsonObject(
@@ -1189,8 +1188,7 @@ final Matcher isElement = new LazyMatcher(() => new MatchesJsonObject(
   }, optionalFields: {
     "location": isLocation,
     "parameters": isString,
-    "returnType": isString,
-    "typeParameters": isString
+    "returnType": isString
   }));
 
 /**
@@ -1446,7 +1444,6 @@ final Matcher isHighlightRegionType = new MatchesEnum("HighlightRegionType", [
  *   "length": int
  *   "containingLibraryPath": optional String
  *   "containingLibraryName": optional String
- *   "containingClassDescription": optional String
  *   "dartdoc": optional String
  *   "elementDescription": optional String
  *   "elementKind": optional String
@@ -1462,7 +1459,6 @@ final Matcher isHoverInformation = new LazyMatcher(() => new MatchesJsonObject(
   }, optionalFields: {
     "containingLibraryPath": isString,
     "containingLibraryName": isString,
-    "containingClassDescription": isString,
     "dartdoc": isString,
     "elementDescription": isString,
     "elementKind": isString,

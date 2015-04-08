@@ -7,46 +7,54 @@ library services.src.refactoring.sort_members;
 import 'package:analysis_server/src/protocol.dart' hide Element;
 import 'package:analysis_server/src/services/correction/strings.dart';
 import 'package:analyzer/src/generated/ast.dart';
-import 'package:analyzer/src/generated/scanner.dart';
+
 
 /**
  * Sorter for unit/class members.
  */
 class MemberSorter {
   static List<_PriorityItem> _PRIORITY_ITEMS = [
-    new _PriorityItem(false, _MemberKind.UNIT_FUNCTION_MAIN, false),
-    new _PriorityItem(false, _MemberKind.UNIT_VARIABLE, false),
-    new _PriorityItem(false, _MemberKind.UNIT_VARIABLE, true),
-    new _PriorityItem(false, _MemberKind.UNIT_ACCESSOR, false),
-    new _PriorityItem(false, _MemberKind.UNIT_ACCESSOR, true),
-    new _PriorityItem(false, _MemberKind.UNIT_FUNCTION, false),
-    new _PriorityItem(false, _MemberKind.UNIT_FUNCTION, true),
-    new _PriorityItem(false, _MemberKind.UNIT_FUNCTION_TYPE, false),
-    new _PriorityItem(false, _MemberKind.UNIT_FUNCTION_TYPE, true),
-    new _PriorityItem(false, _MemberKind.UNIT_CLASS, false),
-    new _PriorityItem(false, _MemberKind.UNIT_CLASS, true),
-    new _PriorityItem(true, _MemberKind.CLASS_FIELD, false),
-    new _PriorityItem(true, _MemberKind.CLASS_ACCESSOR, false),
-    new _PriorityItem(true, _MemberKind.CLASS_ACCESSOR, true),
-    new _PriorityItem(false, _MemberKind.CLASS_FIELD, false),
-    new _PriorityItem(false, _MemberKind.CLASS_CONSTRUCTOR, false),
-    new _PriorityItem(false, _MemberKind.CLASS_CONSTRUCTOR, true),
-    new _PriorityItem(false, _MemberKind.CLASS_ACCESSOR, false),
-    new _PriorityItem(false, _MemberKind.CLASS_ACCESSOR, true),
-    new _PriorityItem(false, _MemberKind.CLASS_METHOD, false),
-    new _PriorityItem(false, _MemberKind.CLASS_METHOD, true),
-    new _PriorityItem(true, _MemberKind.CLASS_METHOD, false),
-    new _PriorityItem(true, _MemberKind.CLASS_METHOD, true)
-  ];
+      new _PriorityItem(false, _MemberKind.UNIT_FUNCTION_MAIN, false),
+      new _PriorityItem(false, _MemberKind.UNIT_VARIABLE, false),
+      new _PriorityItem(false, _MemberKind.UNIT_VARIABLE, true),
+      new _PriorityItem(false, _MemberKind.UNIT_ACCESSOR, false),
+      new _PriorityItem(false, _MemberKind.UNIT_ACCESSOR, true),
+      new _PriorityItem(false, _MemberKind.UNIT_FUNCTION, false),
+      new _PriorityItem(false, _MemberKind.UNIT_FUNCTION, true),
+      new _PriorityItem(false, _MemberKind.UNIT_FUNCTION_TYPE, false),
+      new _PriorityItem(false, _MemberKind.UNIT_FUNCTION_TYPE, true),
+      new _PriorityItem(false, _MemberKind.UNIT_CLASS, false),
+      new _PriorityItem(false, _MemberKind.UNIT_CLASS, true),
+      new _PriorityItem(true, _MemberKind.CLASS_FIELD, false),
+      new _PriorityItem(true, _MemberKind.CLASS_ACCESSOR, false),
+      new _PriorityItem(true, _MemberKind.CLASS_ACCESSOR, true),
+      new _PriorityItem(false, _MemberKind.CLASS_FIELD, false),
+      new _PriorityItem(false, _MemberKind.CLASS_CONSTRUCTOR, false),
+      new _PriorityItem(false, _MemberKind.CLASS_CONSTRUCTOR, true),
+      new _PriorityItem(false, _MemberKind.CLASS_ACCESSOR, false),
+      new _PriorityItem(false, _MemberKind.CLASS_ACCESSOR, true),
+      new _PriorityItem(false, _MemberKind.CLASS_METHOD, false),
+      new _PriorityItem(false, _MemberKind.CLASS_METHOD, true),
+      new _PriorityItem(true, _MemberKind.CLASS_METHOD, false),
+      new _PriorityItem(true, _MemberKind.CLASS_METHOD, true)];
 
   final String initialCode;
   final CompilationUnit unit;
   String code;
-  String endOfLine;
 
   MemberSorter(this.initialCode, this.unit) {
     this.code = initialCode;
-    this.endOfLine = getEOL(code);
+  }
+
+  /**
+   * Return the EOL to use for [code].
+   */
+  String get endOfLine {
+    if (code.contains('\r\n')) {
+      return '\r\n';
+    } else {
+      return '\n';
+    }
   }
 
   /**
@@ -67,7 +75,8 @@ class MemberSorter {
       String suffix = code.substring(code.length - suffixLength, code.length);
       int commonLength = findCommonOverlap(prefix, suffix);
       suffixLength -= commonLength;
-      SourceEdit edit = new SourceEdit(prefixLength,
+      SourceEdit edit = new SourceEdit(
+          prefixLength,
           initialCode.length - suffixLength - prefixLength,
           code.substring(prefixLength, code.length - suffixLength));
       edits.add(edit);
@@ -225,29 +234,6 @@ class MemberSorter {
       directivesCode = sb.toString();
       directivesCode = directivesCode.trimRight();
     }
-    // append comment tokens which otherwise would be removed completely
-    {
-      bool firstCommentToken = true;
-      Token token = unit.beginToken;
-      while (token != null &&
-          token.type != TokenType.EOF &&
-          token.end < lastDirectiveEnd) {
-        Token commentToken = token.precedingComments;
-        while (commentToken != null) {
-          int offset = commentToken.offset;
-          int end = commentToken.end;
-          if (offset > firstDirectiveOffset && offset < lastDirectiveEnd) {
-            if (firstCommentToken) {
-              directivesCode += endOfLine;
-              firstCommentToken = false;
-            }
-            directivesCode += code.substring(offset, end) + endOfLine;
-          }
-          commentToken = commentToken.next;
-        }
-        token = token.next;
-      }
-    }
     // prepare code
     String beforeDirectives = code.substring(0, firstDirectiveOffset);
     String afterDirectives = code.substring(lastDirectiveEnd);
@@ -312,17 +298,6 @@ class MemberSorter {
     _sortAndReorderMembers(members);
   }
 
-  /**
-   * Return the EOL to use for [code].
-   */
-  static String getEOL(String code) {
-    if (code.contains('\r\n')) {
-      return '\r\n';
-    } else {
-      return '\n';
-    }
-  }
-
   static int _getPriority(_PriorityItem item) {
     for (int i = 0; i < _PRIORITY_ITEMS.length; i++) {
       if (_PRIORITY_ITEMS[i] == item) {
@@ -353,6 +328,7 @@ class MemberSorter {
   }
 }
 
+
 class _DirectiveInfo implements Comparable<_DirectiveInfo> {
   final Directive directive;
   final _DirectivePriority priority;
@@ -371,6 +347,7 @@ class _DirectiveInfo implements Comparable<_DirectiveInfo> {
   @override
   String toString() => '(priority=$priority; text=$text)';
 }
+
 
 class _DirectivePriority {
   static const IMPORT_SDK = const _DirectivePriority('IMPORT_SDK', 0);
@@ -391,6 +368,7 @@ class _DirectivePriority {
   @override
   String toString() => name;
 }
+
 
 class _MemberInfo {
   final _PriorityItem item;
@@ -431,6 +409,7 @@ class _MemberKind {
   @override
   String toString() => name;
 }
+
 
 class _PriorityItem {
   final _MemberKind kind;
