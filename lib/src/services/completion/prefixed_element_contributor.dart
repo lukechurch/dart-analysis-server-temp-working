@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-library services.completion.computer.dart.invocation;
+library services.completion.contributor.dart.invocation;
 
 import 'dart:async';
 
@@ -13,13 +13,15 @@ import 'package:analysis_server/src/services/completion/suggestion_builder.dart'
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/element.dart';
 
-import '../../protocol_server.dart' show CompletionSuggestionKind;
+import '../../protocol_server.dart' as protocol;
+import '../../protocol_server.dart'
+    show CompletionSuggestion, CompletionSuggestionKind;
 
 /**
- * A computer for calculating invocation / access suggestions
+ * A contributor for calculating invocation / access suggestions
  * `completion.getSuggestions` request results.
  */
-class InvocationComputer extends DartCompletionComputer {
+class PrefixedElementContributor extends DartCompletionContributor {
   SuggestionBuilder builder;
 
   @override
@@ -303,8 +305,6 @@ class _PrefixedIdentifierSuggestionBuilder
 
   @override
   Future<bool> visitPrefixElement(PrefixElement element) {
-    //TODO (danrubel) reimplement to use prefixElement.importedLibraries
-    // once that accessor is implemented and available in Dart
     bool modified = false;
     // Find the import directive with the given prefix
     for (Directive directive in request.unit.directives) {
@@ -317,6 +317,22 @@ class _PrefixedIdentifierSuggestionBuilder
                 CompletionSuggestionKind.INVOCATION, library,
                 request.target.containingNode.parent is TypeName);
             modified = true;
+            if (directive.deferredKeyword != null) {
+              String completion = 'loadLibrary';
+              CompletionSuggestion suggestion = new CompletionSuggestion(
+                  CompletionSuggestionKind.INVOCATION, DART_RELEVANCE_DEFAULT,
+                  completion, completion.length, 0, false, false,
+                  parameterNames: [],
+                  parameterTypes: [],
+                  requiredParameterCount: 0,
+                  hasNamedParameters: false,
+                  returnType: 'void');
+              suggestion.element = new protocol.Element(
+                  protocol.ElementKind.FUNCTION, completion,
+                  protocol.Element.makeFlags(),
+                  parameters: '()', returnType: 'void');
+              request.addSuggestion(suggestion);
+            }
           }
         }
       }

@@ -9,6 +9,7 @@ dependencies:
   analyzer:
     git: git://github.com/lukechurch/dart-analyzer-temp-working.git
   args: '>=0.12.1 <0.13.0'
+  dart_style: '>=0.1.7 <0.2.0'
   logging: any
   path: any
   watcher: any

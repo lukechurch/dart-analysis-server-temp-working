@@ -5,7 +5,7 @@
 library test.services.completion.dart.arglist;
 
 import 'package:analysis_server/src/protocol.dart';
-import 'package:analysis_server/src/services/completion/arglist_computer.dart';
+import 'package:analysis_server/src/services/completion/arglist_contributor.dart';
 import 'package:unittest/unittest.dart';
 
 import '../../reflective_tests.dart';
@@ -13,14 +13,14 @@ import 'completion_test_util.dart';
 
 main() {
   groupSep = ' | ';
-  runReflectiveTests(ArgListComputerTest);
+  runReflectiveTests(ArgListContributorTest);
 }
 
 @reflectiveTest
-class ArgListComputerTest extends AbstractCompletionTest {
+class ArgListContributorTest extends AbstractCompletionTest {
   @override
-  void setUpComputer() {
-    computer = new ArgListComputer();
+  void setUpContributor() {
+    contributor = new ArgListContributor();
   }
 
   test_ArgumentList_imported_function_0() {

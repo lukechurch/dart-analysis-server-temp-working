@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-library services.completion.computer.dart.keyword;
+library services.completion.contributor.dart.keyword;
 
 import 'dart:async';
 
@@ -12,10 +12,10 @@ import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/scanner.dart';
 
 /**
- * A computer for calculating `completion.getSuggestions` request results
+ * A contributor for calculating `completion.getSuggestions` request results
  * for the local library in which the completion is requested.
  */
-class KeywordComputer extends DartCompletionComputer {
+class KeywordContributor extends DartCompletionContributor {
   @override
   bool computeFast(DartCompletionRequest request) {
     request.target.containingNode.accept(new _KeywordVisitor(request));
@@ -106,6 +106,14 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
         return;
       }
     }
+    if (previousMember is ImportDirective) {
+      if (previousMember.semicolon == null || previousMember.semicolon.isSynthetic) {
+        // If the prior member is an unfinished import directive
+        // then the user is probably finishing that
+        _addImportDirectiveKeywords(previousMember);
+        return;
+      }
+    }
     if (previousMember == null || previousMember is Directive) {
       if (previousMember == null &&
           !node.directives.any((d) => d is LibraryDirective)) {
@@ -125,6 +133,27 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
         Keyword.VAR,
         Keyword.VOID
       ], DART_RELEVANCE_HIGH);
+    }
+  }
+
+  @override
+  visitImportDirective(ImportDirective node) {
+    if (entity == node.asKeyword) {
+      if (node.deferredKeyword == null) {
+        _addSuggestion(Keyword.DEFERRED, DART_RELEVANCE_HIGH);
+      }
+    }
+    if (entity == node.semicolon) {
+      _addImportDirectiveKeywords(node);
+    }
+  }
+
+  void _addImportDirectiveKeywords(ImportDirective node) {
+    if (node.asKeyword == null) {
+      _addSuggestion(Keyword.AS, DART_RELEVANCE_HIGH);
+      if (node.deferredKeyword == null) {
+        _addSuggestion(Keyword.DEFERRED, DART_RELEVANCE_HIGH);
+      }
     }
   }
 

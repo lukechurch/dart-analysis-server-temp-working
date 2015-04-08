@@ -5,7 +5,7 @@
 library test.services.completion.dart.combinator;
 
 import 'package:analysis_server/src/protocol.dart';
-import 'package:analysis_server/src/services/completion/combinator_computer.dart';
+import 'package:analysis_server/src/services/completion/combinator_contributor.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_manager.dart';
 import 'package:unittest/unittest.dart';
 
@@ -14,14 +14,14 @@ import 'completion_test_util.dart';
 
 main() {
   groupSep = ' | ';
-  runReflectiveTests(CombinatorComputerTest);
+  runReflectiveTests(CombinatorContributorTest);
 }
 
 @reflectiveTest
-class CombinatorComputerTest extends AbstractCompletionTest {
+class CombinatorContributorTest extends AbstractCompletionTest {
   @override
-  void setUpComputer() {
-    computer = new CombinatorComputer();
+  void setUpContributor() {
+    contributor = new CombinatorContributor();
   }
 
   test_Block_inherited_local() {

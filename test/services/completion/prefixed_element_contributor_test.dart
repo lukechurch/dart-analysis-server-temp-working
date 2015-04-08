@@ -8,7 +8,7 @@ import 'dart:async';
 
 import 'package:analysis_server/src/protocol.dart';
 import 'package:analysis_server/src/services/completion/dart_completion_manager.dart';
-import 'package:analysis_server/src/services/completion/invocation_computer.dart';
+import 'package:analysis_server/src/services/completion/prefixed_element_contributor.dart';
 import 'package:unittest/unittest.dart';
 
 import '../../reflective_tests.dart';
@@ -16,11 +16,11 @@ import 'completion_test_util.dart';
 
 main() {
   groupSep = ' | ';
-  runReflectiveTests(InvocationComputerTest);
+  runReflectiveTests(PrefixedElementContributorTest);
 }
 
 @reflectiveTest
-class InvocationComputerTest extends AbstractSelectorSuggestionTest {
+class PrefixedElementContributorTest extends AbstractSelectorSuggestionTest {
   @override
   CompletionSuggestion assertSuggestInvocationField(String name, String type,
       {int relevance: DART_RELEVANCE_DEFAULT, bool isDeprecated: false}) {
@@ -70,8 +70,8 @@ void f(Derived d) {
   }
 
   @override
-  void setUpComputer() {
-    computer = new InvocationComputer();
+  void setUpContributor() {
+    contributor = new PrefixedElementContributor();
   }
 
   test_generic_field() {
@@ -142,6 +142,7 @@ void f(C<int> c) {
     addTestSource('import "dart:async" as bar; foo() {bar.^}');
     return computeFull((bool result) {
       assertSuggestClass('Future');
+      assertNotSuggested('loadLibrary');
     });
   }
 
@@ -150,6 +151,15 @@ void f(C<int> c) {
     addTestSource('import "dart:async" as bar; foo() {bar.^ print("f")}');
     return computeFull((bool result) {
       assertSuggestClass('Future');
+    });
+  }
+
+  test_libraryPrefix_deferred() {
+    // SimpleIdentifier  PrefixedIdentifier  ExpressionStatement
+    addTestSource('import "dart:async" deferred as bar; foo() {bar.^}');
+    return computeFull((bool result) {
+      assertSuggestClass('Future');
+      assertSuggestFunction('loadLibrary', 'void');
     });
   }
 

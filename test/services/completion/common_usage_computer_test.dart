@@ -133,28 +133,6 @@ class CommonUsageComputerTest extends AbstractAnalysisTest {
     createProject();
   }
 
-  test_Working() async {
-
-    String src = 'import "dart:async"; ^';
-
-    addTestFile(src);
-    await getSuggestions({});
-
-    print (suggestions);
-
-    print("done");
-//
-//    expect(replacementOffset, equals(completionOffset));
-//    expect(replacementLength, equals(0));
-//    assertHasResult(CompletionSuggestionKind.INVOCATION, 'delayed');
-//    assertHasResult(CompletionSuggestionKind.INVOCATION,
-//        'value', DART_RELEVANCE_COMMON_USAGE);
-//    assertNoResult('Future');
-//    assertNoResult('Object');
-//    assertNoResult('A');
-  }
-
-
   test_ConstructorName() async {
     // SimpleIdentifier  ConstructorName  InstanceCreationExpression
     addTestFile('import "dart:async"; class A {x() {new Future.^}}');
