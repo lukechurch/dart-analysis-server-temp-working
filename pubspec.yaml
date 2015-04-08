@@ -14,6 +14,7 @@ dependencies:
   dart_style:
     git:
       url: git://github.com/lukechurch/dart_style.git
+      ref: v191
   logging: any
   path: any
   watcher: any
