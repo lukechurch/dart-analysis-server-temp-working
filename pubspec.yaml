@@ -7,8 +7,13 @@ environment:
   sdk: '>=1.0.0 <2.0.0'
 dependencies:
   analyzer:
-    git: git://github.com/lukechurch/dart-analyzer-temp-working.git
+    git:
+      url: git://github.com/lukechurch/dart-analyzer-temp-working.git
+      ref: v191
   args: '>=0.12.1 <0.13.0'
+  dart_style:
+    git:
+      url: git://github.com/lukechurch/dart_style.git
   logging: any
   path: any
   watcher: any
