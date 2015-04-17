@@ -42,7 +42,7 @@ abstract class AbstractCompletionTest extends AbstractContextTest {
   CompilationUnit testUnit;
   int completionOffset;
   AstNode completionNode;
-  bool _computeFastCalled = false;
+  bool computeFastResult;
   DartCompletionRequest request;
   DartCompletionCache cache;
   DartCompletionManager _completionManager;
@@ -129,46 +129,6 @@ abstract class AbstractCompletionTest extends AbstractContextTest {
     expect(cs.isDeprecated, equals(isDeprecated));
     expect(cs.isPotential, equals(isPotential));
     return cs;
-  }
-
-  void assertSuggestArgumentList(
-      List<String> paramNames, List<String> paramTypes) {
-    CompletionSuggestionKind csKind = CompletionSuggestionKind.ARGUMENT_LIST;
-    CompletionSuggestion cs = getSuggest(csKind: csKind);
-    if (cs == null) {
-      failedCompletion('expected completion $csKind', request.suggestions);
-    }
-    assertSuggestArgumentList_params(
-        paramNames, paramTypes, cs.parameterNames, cs.parameterTypes);
-    expect(cs.relevance, DART_RELEVANCE_HIGH);
-  }
-
-  void assertSuggestArgumentList_params(List<String> expectedNames,
-      List<String> expectedTypes, List<String> actualNames,
-      List<String> actualTypes) {
-    if (actualNames != null &&
-        actualNames.length == expectedNames.length &&
-        actualTypes != null &&
-        actualTypes.length == expectedTypes.length) {
-      int index = 0;
-      while (index < expectedNames.length) {
-        if (actualNames[index] != expectedNames[index] ||
-            actualTypes[index] != expectedTypes[index]) {
-          break;
-        }
-        ++index;
-      }
-      if (index == expectedNames.length) {
-        return;
-      }
-    }
-    StringBuffer msg = new StringBuffer();
-    msg.writeln('Argument list not the same');
-    msg.writeln('  Expected names: $expectedNames');
-    msg.writeln('           found: $actualNames');
-    msg.writeln('  Expected types: $expectedTypes');
-    msg.writeln('           found: $actualTypes');
-    fail(msg.toString());
   }
 
   CompletionSuggestion assertSuggestClass(String name,
@@ -422,21 +382,27 @@ abstract class AbstractCompletionTest extends AbstractContextTest {
   }
 
   bool computeFast() {
-    _computeFastCalled = true;
+    expect(computeFastResult, isNull);
     _completionManager = new DartCompletionManager(context, searchEngine,
         testSource, cache, [contributor], new CommonUsageComputer({}));
     var result = _completionManager.computeFast(request);
     expect(request.replacementOffset, isNotNull);
     expect(request.replacementLength, isNotNull);
-    return result.isEmpty;
+    computeFastResult = result.isEmpty;
+    return computeFastResult;
   }
 
   Future computeFull(assertFunction(bool result), {bool fullAnalysis: true}) {
-    if (!_computeFastCalled) {
-      expect(computeFast(), isFalse);
+    if (computeFastResult == null) {
+      computeFast();
     }
-    resolve(fullAnalysis);
-    return contributor.computeFull(request).then(assertFunction);
+    if (computeFastResult) {
+      assertFunction(true);
+      return new Future.value(true);
+    } else {
+      resolve(fullAnalysis);
+      return contributor.computeFull(request).then(assertFunction);
+    }
   }
 
   void failedCompletion(String message,
@@ -3655,6 +3621,161 @@ abstract class AbstractSelectorSuggestionTest extends AbstractCompletionTest {
       assertSuggestInvocationMethod('_n', 'A', 'I');
       assertSuggestInvocationSetter('s1');
       assertSuggestInvocationSetter('_s2');
+      assertNotSuggested('z');
+      assertNotSuggested('I');
+      assertNotSuggested('A');
+      assertNotSuggested('X');
+      assertNotSuggested('Object');
+      assertNotSuggested('==');
+    });
+  }
+
+  test_ThisExpression_constructor_param() {
+    // SimpleIdentifier  FieldFormalParameter  FormalParameterList
+    addTestSource('''
+      main() { }
+      class I {X get f => new A();get _g => new A();}
+      class A implements I {
+        A(this.^) {}
+        A.z() {}
+        var b; X _c;
+        X get d => new A();get _e => new A();
+        // no semicolon between completion point and next statement
+        set s1(I x) {} set _s2(I x) {m(null);}
+        m(X x) {} I _n(X x) {}}
+      class X{}''');
+    computeFast();
+    return computeFull((bool result) {
+      expect(request.replacementOffset, completionOffset);
+      expect(request.replacementLength, 0);
+      assertSuggestInvocationField('b', null,
+          relevance: DART_RELEVANCE_LOCAL_FIELD);
+      assertSuggestInvocationField('_c', 'X',
+          relevance: DART_RELEVANCE_LOCAL_FIELD);
+      assertNotSuggested('d');
+      assertNotSuggested('_e');
+      assertNotSuggested('f');
+      assertNotSuggested('_g');
+      assertNotSuggested('m');
+      assertNotSuggested('_n');
+      assertNotSuggested('s1');
+      assertNotSuggested('_s2');
+      assertNotSuggested('z');
+      assertNotSuggested('I');
+      assertNotSuggested('A');
+      assertNotSuggested('X');
+      assertNotSuggested('Object');
+      assertNotSuggested('==');
+    });
+  }
+
+  test_ThisExpression_constructor_param2() {
+    // SimpleIdentifier  FieldFormalParameter  FormalParameterList
+    addTestSource('''
+      main() { }
+      class I {X get f => new A();get _g => new A();}
+      class A implements I {
+        A(this.b^) {}
+        A.z() {}
+        var b; X _c;
+        X get d => new A();get _e => new A();
+        // no semicolon between completion point and next statement
+        set s1(I x) {} set _s2(I x) {m(null);}
+        m(X x) {} I _n(X x) {}}
+      class X{}''');
+    computeFast();
+    return computeFull((bool result) {
+      expect(request.replacementOffset, completionOffset - 1);
+      expect(request.replacementLength, 1);
+      assertSuggestInvocationField('b', null,
+          relevance: DART_RELEVANCE_LOCAL_FIELD);
+      assertSuggestInvocationField('_c', 'X',
+          relevance: DART_RELEVANCE_LOCAL_FIELD);
+      assertNotSuggested('d');
+      assertNotSuggested('_e');
+      assertNotSuggested('f');
+      assertNotSuggested('_g');
+      assertNotSuggested('m');
+      assertNotSuggested('_n');
+      assertNotSuggested('s1');
+      assertNotSuggested('_s2');
+      assertNotSuggested('z');
+      assertNotSuggested('I');
+      assertNotSuggested('A');
+      assertNotSuggested('X');
+      assertNotSuggested('Object');
+      assertNotSuggested('==');
+    });
+  }
+
+  test_ThisExpression_constructor_param3() {
+    // SimpleIdentifier  FieldFormalParameter  FormalParameterList
+    addTestSource('''
+      main() { }
+      class I {X get f => new A();get _g => new A();}
+      class A implements I {
+        A(this.^b) {}
+        A.z() {}
+        var b; X _c;
+        X get d => new A();get _e => new A();
+        // no semicolon between completion point and next statement
+        set s1(I x) {} set _s2(I x) {m(null);}
+        m(X x) {} I _n(X x) {}}
+      class X{}''');
+    computeFast();
+    return computeFull((bool result) {
+      expect(request.replacementOffset, completionOffset);
+      expect(request.replacementLength, 1);
+      assertSuggestInvocationField('b', null,
+          relevance: DART_RELEVANCE_LOCAL_FIELD);
+      assertSuggestInvocationField('_c', 'X',
+          relevance: DART_RELEVANCE_LOCAL_FIELD);
+      assertNotSuggested('d');
+      assertNotSuggested('_e');
+      assertNotSuggested('f');
+      assertNotSuggested('_g');
+      assertNotSuggested('m');
+      assertNotSuggested('_n');
+      assertNotSuggested('s1');
+      assertNotSuggested('_s2');
+      assertNotSuggested('z');
+      assertNotSuggested('I');
+      assertNotSuggested('A');
+      assertNotSuggested('X');
+      assertNotSuggested('Object');
+      assertNotSuggested('==');
+    });
+  }
+
+  test_ThisExpression_constructor_param4() {
+    // SimpleIdentifier  FieldFormalParameter  FormalParameterList
+    addTestSource('''
+      main() { }
+      class I {X get f => new A();get _g => new A();}
+      class A implements I {
+        A(this.b, this.^) {}
+        A.z() {}
+        var b; X _c;
+        X get d => new A();get _e => new A();
+        // no semicolon between completion point and next statement
+        set s1(I x) {} set _s2(I x) {m(null);}
+        m(X x) {} I _n(X x) {}}
+      class X{}''');
+    computeFast();
+    return computeFull((bool result) {
+      expect(request.replacementOffset, completionOffset);
+      expect(request.replacementLength, 0);
+      assertNotSuggested('b');
+      assertSuggestInvocationField('_c', 'X',
+          relevance: DART_RELEVANCE_LOCAL_FIELD);
+      assertNotSuggested('d');
+      assertNotSuggested('_e');
+      assertNotSuggested('f');
+      assertNotSuggested('_g');
+      assertNotSuggested('m');
+      assertNotSuggested('_n');
+      assertNotSuggested('s1');
+      assertNotSuggested('_s2');
       assertNotSuggested('z');
       assertNotSuggested('I');
       assertNotSuggested('A');
