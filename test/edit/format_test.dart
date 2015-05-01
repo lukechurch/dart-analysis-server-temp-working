@@ -9,15 +9,16 @@ import 'dart:async';
 import 'package:analysis_server/src/edit/edit_domain.dart';
 import 'package:analysis_server/src/plugin/server_plugin.dart';
 import 'package:analysis_server/src/protocol.dart';
-import 'package:analyzer/src/plugin/plugin_impl.dart';
+import 'package:plugin/manager.dart';
+import 'package:test_reflective_loader/test_reflective_loader.dart';
 import 'package:unittest/unittest.dart' hide ERROR;
 
 import '../analysis_abstract.dart';
-import '../reflective_tests.dart';
+import '../mocks.dart';
 
 main() {
   groupSep = ' | ';
-  runReflectiveTests(FormatTest);
+  defineReflectiveTests(FormatTest);
 }
 
 @reflectiveTest
@@ -84,6 +85,17 @@ main() {
 '''));
       expect(formatResult.selectionOffset, equals(0));
       expect(formatResult.selectionLength, equals(3));
+    });
+  }
+
+  Future test_withErrors() {
+    addTestFile('''
+main() { int x = 
+''');
+    return waitForTasksFinished().then((_) {
+      Request request = new EditFormatParams(testFile, 0, 3).toRequest('0');
+      Response response = handler.handleRequest(request);
+      expect(response, isResponseFailure('0'));
     });
   }
 

@@ -11,6 +11,9 @@ import 'package:analysis_server/src/services/completion/dart_completion_manager.
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/scanner.dart';
 
+const ASYNC = 'async';
+const AWAIT = 'await';
+
 /**
  * A contributor for calculating `completion.getSuggestions` request results
  * for the local library in which the completion is requested.
@@ -40,6 +43,14 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
         this.entity = request.target.entity;
 
   @override
+  visitArgumentList(ArgumentList node) {
+    if (entity == node.rightParenthesis ||
+        (entity is SimpleIdentifier && node.arguments.contains(entity))) {
+      _addExpressionKeywords(node);
+    }
+  }
+
+  @override
   visitBlock(Block node) {
     _addStatementKeywords(node);
   }
@@ -50,22 +61,18 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
     if (entity == node.name) {
       return;
     }
-    if (entity == node.rightBracket || entity is ClassMember) {
-      _addSuggestions([
-        Keyword.CONST,
-        Keyword.DYNAMIC,
-        Keyword.FACTORY,
-        Keyword.FINAL,
-        Keyword.GET,
-        Keyword.OPERATOR,
-        Keyword.SET,
-        Keyword.STATIC,
-        Keyword.VAR,
-        Keyword.VOID
-      ]);
-      return;
+    if (entity == node.rightBracket) {
+      _addClassBodyKeywords();
+    } else if (entity is ClassMember) {
+      _addClassBodyKeywords();
+      int index = node.members.indexOf(entity);
+      ClassMember previous = index > 0 ? node.members[index - 1] : null;
+      if (previous is MethodDeclaration && previous.body is EmptyFunctionBody) {
+        _addSuggestion2(ASYNC);
+      }
+    } else {
+      _addClassDeclarationKeywords(node);
     }
-    _addClassDeclarationKeywords(node);
   }
 
   @override
@@ -104,16 +111,40 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
           [Keyword.EXPORT, Keyword.IMPORT, Keyword.PART], DART_RELEVANCE_HIGH);
     }
     if (entity == null || entity is Declaration) {
-      _addSuggestions([
-        Keyword.ABSTRACT,
-        Keyword.CLASS,
-        Keyword.CONST,
-        Keyword.DYNAMIC,
-        Keyword.FINAL,
-        Keyword.TYPEDEF,
-        Keyword.VAR,
-        Keyword.VOID
-      ], DART_RELEVANCE_HIGH);
+      if (previousMember is FunctionDeclaration &&
+          previousMember.functionExpression is FunctionExpression &&
+          previousMember.functionExpression.body is EmptyFunctionBody) {
+        _addSuggestion2(ASYNC, DART_RELEVANCE_HIGH);
+      }
+      _addCompilationUnitKeywords();
+    }
+  }
+
+  @override
+  visitExpressionFunctionBody(ExpressionFunctionBody node) {
+    if (entity == node.expression) {
+      _addExpressionKeywords(node);
+    }
+  }
+
+  @override
+  visitFormalParameterList(FormalParameterList node) {
+    AstNode constructorDecl =
+        node.getAncestor((p) => p is ConstructorDeclaration);
+    if (constructorDecl != null) {
+      _addSuggestions([Keyword.THIS]);
+    }
+  }
+
+  @override
+  visitFunctionExpression(FunctionExpression node) {
+    if (entity == node.body) {
+      _addSuggestion2(ASYNC, DART_RELEVANCE_HIGH);
+      if (node.body is EmptyFunctionBody &&
+          node.parent is FunctionDeclaration &&
+          node.parent.parent is CompilationUnit) {
+        _addCompilationUnitKeywords();
+      }
     }
   }
 
@@ -136,6 +167,74 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
     }
   }
 
+  @override
+  visitMethodDeclaration(MethodDeclaration node) {
+    if (entity == node.body) {
+      if (node.body is EmptyFunctionBody) {
+        _addClassBodyKeywords();
+        _addSuggestion2(ASYNC);
+      } else {
+        _addSuggestion2(ASYNC, DART_RELEVANCE_HIGH);
+      }
+    }
+  }
+
+  @override
+  visitNamedExpression(NamedExpression node) {
+    if (entity is SimpleIdentifier && entity == node.expression) {
+      _addExpressionKeywords(node);
+    }
+  }
+
+  @override
+  visitNode(AstNode node) {
+    // ignored
+  }
+
+  @override
+  visitSwitchStatement(SwitchStatement node) {
+    if (entity == node.expression) {
+      _addExpressionKeywords(node);
+    } else if (entity == node.rightBracket) {
+      if (node.members.isEmpty) {
+        _addSuggestions([Keyword.CASE, Keyword.DEFAULT], DART_RELEVANCE_HIGH);
+      } else {
+        _addSuggestions([Keyword.CASE, Keyword.DEFAULT]);
+        _addStatementKeywords(node);
+      }
+    }
+    if (node.members.contains(entity)) {
+      if (entity == node.members.first) {
+        _addSuggestions([Keyword.CASE, Keyword.DEFAULT], DART_RELEVANCE_HIGH);
+      } else {
+        _addSuggestions([Keyword.CASE, Keyword.DEFAULT]);
+        _addStatementKeywords(node);
+      }
+    }
+  }
+
+  @override
+  visitVariableDeclaration(VariableDeclaration node) {
+    if (entity == node.initializer) {
+      _addExpressionKeywords(node);
+    }
+  }
+
+  void _addClassBodyKeywords() {
+    _addSuggestions([
+      Keyword.CONST,
+      Keyword.DYNAMIC,
+      Keyword.FACTORY,
+      Keyword.FINAL,
+      Keyword.GET,
+      Keyword.OPERATOR,
+      Keyword.SET,
+      Keyword.STATIC,
+      Keyword.VAR,
+      Keyword.VOID
+    ]);
+  }
+
   void _addClassDeclarationKeywords(ClassDeclaration node) {
     // Very simplistic suggestion because analyzer will warn if
     // the extends / with / implements keywords are out of order
@@ -149,6 +248,29 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
     }
   }
 
+  void _addCompilationUnitKeywords() {
+    _addSuggestions([
+      Keyword.ABSTRACT,
+      Keyword.CLASS,
+      Keyword.CONST,
+      Keyword.DYNAMIC,
+      Keyword.FINAL,
+      Keyword.TYPEDEF,
+      Keyword.VAR,
+      Keyword.VOID
+    ], DART_RELEVANCE_HIGH);
+  }
+
+  void _addExpressionKeywords(AstNode node) {
+    _addSuggestions([Keyword.FALSE, Keyword.NEW, Keyword.NULL, Keyword.TRUE,]);
+    if (_inClassMemberBody(node)) {
+      _addSuggestions([Keyword.SUPER, Keyword.THIS,]);
+    }
+    if (_inAsyncMethodOrFunction(node)) {
+      _addSuggestion2(AWAIT);
+    }
+  }
+
   void _addImportDirectiveKeywords(ImportDirective node) {
     if (node.asKeyword == null) {
       _addSuggestion(Keyword.AS, DART_RELEVANCE_HIGH);
@@ -159,12 +281,14 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
   }
 
   void _addStatementKeywords(AstNode node) {
-    if (_isInClassMemberBody(node)) {
+    if (_inClassMemberBody(node)) {
       _addSuggestions([Keyword.SUPER, Keyword.THIS,]);
+    }
+    if (_inAsyncMethodOrFunction(node)) {
+      _addSuggestion2(AWAIT);
     }
     _addSuggestions([
       Keyword.ASSERT,
-      Keyword.CASE,
       Keyword.CONTINUE,
       Keyword.DO,
       Keyword.FINAL,
@@ -183,8 +307,12 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
   }
 
   void _addSuggestion(Keyword keyword,
-      [int relevance = DART_RELEVANCE_DEFAULT]) {
-    String completion = keyword.syntax;
+      [int relevance = DART_RELEVANCE_KEYWORD]) {
+    _addSuggestion2(keyword.syntax, relevance);
+  }
+
+  void _addSuggestion2(String completion,
+      [int relevance = DART_RELEVANCE_KEYWORD]) {
     request.addSuggestion(new CompletionSuggestion(
         CompletionSuggestionKind.KEYWORD, relevance, completion,
         completion.length, 0, false, false));
@@ -197,7 +325,12 @@ class _KeywordVisitor extends GeneralizingAstVisitor {
     });
   }
 
-  bool _isInClassMemberBody(AstNode node) {
+  bool _inAsyncMethodOrFunction(AstNode node) {
+    FunctionBody body = node.getAncestor((n) => n is FunctionBody);
+    return body != null && body.isAsynchronous;
+  }
+
+  bool _inClassMemberBody(AstNode node) {
     while (true) {
       AstNode body = node.getAncestor((n) => n is FunctionBody);
       if (body == null) {

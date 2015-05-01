@@ -13,15 +13,15 @@ import 'package:analyzer/source/package_map_resolver.dart';
 import 'package:analyzer/src/generated/error.dart';
 import 'package:analyzer/src/generated/parser.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:test_reflective_loader/test_reflective_loader.dart';
 import 'package:unittest/unittest.dart';
 
 import '../../abstract_context.dart';
 import '../../abstract_single_unit.dart';
-import '../../reflective_tests.dart';
 
 main() {
   groupSep = ' | ';
-  runReflectiveTests(FixProcessorTest);
+  defineReflectiveTests(FixProcessorTest);
 }
 
 typedef bool AnalysisErrorFilter(AnalysisError error);
@@ -1295,6 +1295,23 @@ main() {
 }
 f(String p) {}
 ''');
+    _assertLinkedGroup(change.linkedEditGroups[0], ['String test;']);
+    _assertLinkedGroup(change.linkedEditGroups[1], ['test;', 'test);']);
+  }
+
+  void test_createLocalVariable_read_typeInvocationTarget() {
+    resolveTestUnit('''
+main() {
+  test.add('hello');
+}
+''');
+    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+main() {
+  var test;
+  test.add('hello');
+}
+''');
+    _assertLinkedGroup(change.linkedEditGroups[0], ['test;', 'test.add(']);
   }
 
   void test_createLocalVariable_write_assignment() {
@@ -2430,6 +2447,56 @@ main(p) {
     for (var error in errors) {
       _computeFixes(error);
     }
+  }
+
+  void test_removeDeadCode_condition() {
+    resolveTestUnit('''
+main(int p) {
+  if (true || p > 5) {
+    print(1);
+  }
+}
+''');
+    assertHasFix(DartFixKind.REMOVE_DEAD_CODE, '''
+main(int p) {
+  if (true) {
+    print(1);
+  }
+}
+''');
+  }
+
+  void test_removeDeadCode_statements_one() {
+    resolveTestUnit('''
+int main() {
+  print(0);
+  return 42;
+  print(1);
+}
+''');
+    assertHasFix(DartFixKind.REMOVE_DEAD_CODE, '''
+int main() {
+  print(0);
+  return 42;
+}
+''');
+  }
+
+  void test_removeDeadCode_statements_two() {
+    resolveTestUnit('''
+int main() {
+  print(0);
+  return 42;
+  print(1);
+  print(2);
+}
+''');
+    assertHasFix(DartFixKind.REMOVE_DEAD_CODE, '''
+int main() {
+  print(0);
+  return 42;
+}
+''');
   }
 
   void test_removeParentheses_inGetterDeclaration() {
