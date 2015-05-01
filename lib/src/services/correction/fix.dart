@@ -18,7 +18,7 @@ import 'package:analyzer/src/generated/java_engine.dart';
 List<Fix> computeFixes(
     ServerPlugin plugin, AnalysisContext context, AnalysisError error) {
   List<Fix> fixes = <Fix>[];
-  List<FixContributor> contributors = plugin.fixContributors();
+  List<FixContributor> contributors = plugin.fixContributors;
   for (FixContributor contributor in contributors) {
     try {
       List<Fix> contributedFixes = contributor.computeFixes(context, error);
@@ -88,6 +88,8 @@ class DartFixKind {
       const FixKind('INSERT_SEMICOLON', 50, "Insert ';'");
   static const MAKE_CLASS_ABSTRACT =
       const FixKind('MAKE_CLASS_ABSTRACT', 50, "Make class '{0}' abstract");
+  static const REMOVE_DEAD_CODE =
+      const FixKind('REMOVE_DEAD_CODE', 50, "Remove dead code");
   static const REMOVE_PARAMETERS_IN_GETTER_DECLARATION = const FixKind(
       'REMOVE_PARAMETERS_IN_GETTER_DECLARATION', 50,
       "Remove parameters in getter declaration");

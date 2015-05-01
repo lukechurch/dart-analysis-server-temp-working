@@ -9,14 +9,14 @@ import 'package:analysis_server/src/services/completion/optype.dart';
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:test_reflective_loader/test_reflective_loader.dart';
 import 'package:unittest/unittest.dart';
 
 import '../../abstract_context.dart';
-import '../../reflective_tests.dart';
 
 main() {
   groupSep = ' | ';
-  runReflectiveTests(OpTypeTest);
+  defineReflectiveTests(OpTypeTest);
 }
 
 @reflectiveTest
@@ -205,6 +205,31 @@ class OpTypeTest {
     // Block  BlockFunctionBody  MethodDeclaration  ClassDeclaration
     addTestSource('class A extends E implements I with M {a() {^}}');
     assertOpType(returnValue: true, typeNames: true, voidReturn: true);
+  }
+
+  test_Block_final() {
+    addTestSource('main() {final ^}');
+    assertOpType(typeNames: true);
+  }
+
+  test_Block_final2() {
+    addTestSource('main() {final S^ v;}');
+    assertOpType(typeNames: true);
+  }
+
+  test_Block_final3() {
+    addTestSource('main() {final ^ v;}');
+    assertOpType(typeNames: true);
+  }
+
+  test_Block_final_final() {
+    addTestSource('main() {final ^ final S x;}');
+    assertOpType(typeNames: true);
+  }
+
+  test_Block_final_final2() {
+    addTestSource('main() {final S^ final S x;}');
+    assertOpType(typeNames: true);
   }
 
   test_Block_identifier_partial() {

@@ -7679,6 +7679,7 @@ class ChangeContentOverlay implements HasToJson {
  *   "hasNamedParameters": optional bool
  *   "parameterName": optional String
  *   "parameterType": optional String
+ *   "importUri": optional String
  * }
  */
 class CompletionSuggestion implements HasToJson {
@@ -7717,6 +7718,8 @@ class CompletionSuggestion implements HasToJson {
   String _parameterName;
 
   String _parameterType;
+
+  String _importUri;
 
   /**
    * The kind of element being suggested.
@@ -7981,7 +7984,21 @@ class CompletionSuggestion implements HasToJson {
     this._parameterType = value;
   }
 
-  CompletionSuggestion(CompletionSuggestionKind kind, int relevance, String completion, int selectionOffset, int selectionLength, bool isDeprecated, bool isPotential, {String docSummary, String docComplete, String declaringType, Element element, String returnType, List<String> parameterNames, List<String> parameterTypes, int requiredParameterCount, bool hasNamedParameters, String parameterName, String parameterType}) {
+  /**
+   * The import to be added if the suggestion is out of scope and needs an
+   * import to be added to be in scope.
+   */
+  String get importUri => _importUri;
+
+  /**
+   * The import to be added if the suggestion is out of scope and needs an
+   * import to be added to be in scope.
+   */
+  void set importUri(String value) {
+    this._importUri = value;
+  }
+
+  CompletionSuggestion(CompletionSuggestionKind kind, int relevance, String completion, int selectionOffset, int selectionLength, bool isDeprecated, bool isPotential, {String docSummary, String docComplete, String declaringType, Element element, String returnType, List<String> parameterNames, List<String> parameterTypes, int requiredParameterCount, bool hasNamedParameters, String parameterName, String parameterType, String importUri}) {
     this.kind = kind;
     this.relevance = relevance;
     this.completion = completion;
@@ -8000,6 +8017,7 @@ class CompletionSuggestion implements HasToJson {
     this.hasNamedParameters = hasNamedParameters;
     this.parameterName = parameterName;
     this.parameterType = parameterType;
+    this.importUri = importUri;
   }
 
   factory CompletionSuggestion.fromJson(JsonDecoder jsonDecoder, String jsonPath, Object json) {
@@ -8093,7 +8111,11 @@ class CompletionSuggestion implements HasToJson {
       if (json.containsKey("parameterType")) {
         parameterType = jsonDecoder._decodeString(jsonPath + ".parameterType", json["parameterType"]);
       }
-      return new CompletionSuggestion(kind, relevance, completion, selectionOffset, selectionLength, isDeprecated, isPotential, docSummary: docSummary, docComplete: docComplete, declaringType: declaringType, element: element, returnType: returnType, parameterNames: parameterNames, parameterTypes: parameterTypes, requiredParameterCount: requiredParameterCount, hasNamedParameters: hasNamedParameters, parameterName: parameterName, parameterType: parameterType);
+      String importUri;
+      if (json.containsKey("importUri")) {
+        importUri = jsonDecoder._decodeString(jsonPath + ".importUri", json["importUri"]);
+      }
+      return new CompletionSuggestion(kind, relevance, completion, selectionOffset, selectionLength, isDeprecated, isPotential, docSummary: docSummary, docComplete: docComplete, declaringType: declaringType, element: element, returnType: returnType, parameterNames: parameterNames, parameterTypes: parameterTypes, requiredParameterCount: requiredParameterCount, hasNamedParameters: hasNamedParameters, parameterName: parameterName, parameterType: parameterType, importUri: importUri);
     } else {
       throw jsonDecoder.mismatch(jsonPath, "CompletionSuggestion");
     }
@@ -8141,6 +8163,9 @@ class CompletionSuggestion implements HasToJson {
     if (parameterType != null) {
       result["parameterType"] = parameterType;
     }
+    if (importUri != null) {
+      result["importUri"] = importUri;
+    }
     return result;
   }
 
@@ -8167,7 +8192,8 @@ class CompletionSuggestion implements HasToJson {
           requiredParameterCount == other.requiredParameterCount &&
           hasNamedParameters == other.hasNamedParameters &&
           parameterName == other.parameterName &&
-          parameterType == other.parameterType;
+          parameterType == other.parameterType &&
+          importUri == other.importUri;
     }
     return false;
   }
@@ -8193,6 +8219,7 @@ class CompletionSuggestion implements HasToJson {
     hash = _JenkinsSmiHash.combine(hash, hasNamedParameters.hashCode);
     hash = _JenkinsSmiHash.combine(hash, parameterName.hashCode);
     hash = _JenkinsSmiHash.combine(hash, parameterType.hashCode);
+    hash = _JenkinsSmiHash.combine(hash, importUri.hashCode);
     return _JenkinsSmiHash.finish(hash);
   }
 }
@@ -8244,6 +8271,11 @@ class CompletionSuggestionKind implements Enum {
    */
   static const KEYWORD = const CompletionSuggestionKind._("KEYWORD");
 
+  /**
+   * A named argument for the current callsite is being suggested. For
+   * suggestions of this kind, the completion is the named argument identifier
+   * including a trailing ':' and space.
+   */
   static const NAMED_ARGUMENT = const CompletionSuggestionKind._("NAMED_ARGUMENT");
 
   static const OPTIONAL_ARGUMENT = const CompletionSuggestionKind._("OPTIONAL_ARGUMENT");
@@ -12062,6 +12094,7 @@ class RequestError implements HasToJson {
  * enum {
  *   CONTENT_MODIFIED
  *   FORMAT_INVALID_FILE
+ *   FORMAT_WITH_ERRORS
  *   GET_ERRORS_INVALID_FILE
  *   INVALID_ANALYSIS_ROOT
  *   INVALID_EXECUTION_CONTEXT
@@ -12093,6 +12126,11 @@ class RequestErrorCode implements Enum {
    * file in an analysis root.
    */
   static const FORMAT_INVALID_FILE = const RequestErrorCode._("FORMAT_INVALID_FILE");
+
+  /**
+   * An "edit.format" request specified a file that contains syntax errors.
+   */
+  static const FORMAT_WITH_ERRORS = const RequestErrorCode._("FORMAT_WITH_ERRORS");
 
   /**
    * An "analysis.getErrors" request specified a FilePath which does not match
@@ -12200,7 +12238,7 @@ class RequestErrorCode implements Enum {
   /**
    * A list containing all of the enum values that are defined.
    */
-  static const List<RequestErrorCode> VALUES = const <RequestErrorCode>[CONTENT_MODIFIED, FORMAT_INVALID_FILE, GET_ERRORS_INVALID_FILE, INVALID_ANALYSIS_ROOT, INVALID_EXECUTION_CONTEXT, INVALID_OVERLAY_CHANGE, INVALID_PARAMETER, INVALID_REQUEST, NO_INDEX_GENERATED, REFACTORING_REQUEST_CANCELLED, SERVER_ALREADY_STARTED, SERVER_ERROR, SORT_MEMBERS_INVALID_FILE, SORT_MEMBERS_PARSE_ERRORS, UNANALYZED_PRIORITY_FILES, UNKNOWN_REQUEST, UNKNOWN_SOURCE, UNSUPPORTED_FEATURE];
+  static const List<RequestErrorCode> VALUES = const <RequestErrorCode>[CONTENT_MODIFIED, FORMAT_INVALID_FILE, FORMAT_WITH_ERRORS, GET_ERRORS_INVALID_FILE, INVALID_ANALYSIS_ROOT, INVALID_EXECUTION_CONTEXT, INVALID_OVERLAY_CHANGE, INVALID_PARAMETER, INVALID_REQUEST, NO_INDEX_GENERATED, REFACTORING_REQUEST_CANCELLED, SERVER_ALREADY_STARTED, SERVER_ERROR, SORT_MEMBERS_INVALID_FILE, SORT_MEMBERS_PARSE_ERRORS, UNANALYZED_PRIORITY_FILES, UNKNOWN_REQUEST, UNKNOWN_SOURCE, UNSUPPORTED_FEATURE];
 
   final String name;
 
@@ -12212,6 +12250,8 @@ class RequestErrorCode implements Enum {
         return CONTENT_MODIFIED;
       case "FORMAT_INVALID_FILE":
         return FORMAT_INVALID_FILE;
+      case "FORMAT_WITH_ERRORS":
+        return FORMAT_WITH_ERRORS;
       case "GET_ERRORS_INVALID_FILE":
         return GET_ERRORS_INVALID_FILE;
       case "INVALID_ANALYSIS_ROOT":
