@@ -4,13 +4,15 @@
 
 library test.services.completion.contributor.dart.importuri;
 
+import 'dart:io';
+
 import 'package:analysis_server/src/protocol.dart';
 import 'package:analysis_server/src/services/completion/import_uri_contributor.dart';
+import 'package:path/path.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 import 'package:unittest/unittest.dart';
 
 import 'completion_test_util.dart';
-import 'dart:io';
 
 main() {
   groupSep = ' | ';
@@ -58,7 +60,7 @@ class ImportUriContributorTest extends AbstractCompletionTest {
   }
 
   test_import_file() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -70,13 +72,14 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     expect(request.replacementLength, 0);
     assertNotSuggested('completion.dart');
     assertSuggest('other.dart', csKind: CompletionSuggestionKind.IMPORT);
-    assertSuggest('foo/', csKind: CompletionSuggestionKind.IMPORT);
-    assertNotSuggested('foo/bar.dart');
-    assertNotSuggested('../blat.dart');
+    assertNotSuggested('foo');
+    assertSuggest('foo${separator}', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('foo${separator}bar.dart');
+    assertNotSuggested('..${separator}blat.dart');
   }
 
   test_import_file2() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -88,13 +91,14 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     expect(request.replacementLength, 2);
     assertNotSuggested('completion.dart');
     assertSuggest('other.dart', csKind: CompletionSuggestionKind.IMPORT);
-    assertSuggest('foo/', csKind: CompletionSuggestionKind.IMPORT);
-    assertNotSuggested('foo/bar.dart');
-    assertNotSuggested('../blat.dart');
+    assertNotSuggested('foo');
+    assertSuggest('foo${separator}', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('foo${separator}bar.dart');
+    assertNotSuggested('..${separator}blat.dart');
   }
 
   test_import_file_child() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -107,12 +111,13 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     assertNotSuggested('completion.dart');
     assertNotSuggested('other.dart');
     assertNotSuggested('foo');
-    assertSuggest('foo/bar.dart', csKind: CompletionSuggestionKind.IMPORT);
-    assertNotSuggested('../blat.dart');
+    assertNotSuggested('foo${separator}');
+    assertSuggest('foo${separator}bar.dart', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('..${separator}blat.dart');
   }
 
   test_import_file_parent() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -125,8 +130,9 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     assertNotSuggested('completion.dart');
     assertNotSuggested('other.dart');
     assertNotSuggested('foo');
-    assertNotSuggested('foo/bar.dart');
-    assertSuggest('../blat.dart', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('foo${separator}');
+    assertNotSuggested('foo${separator}bar.dart');
+    assertSuggest('..${separator}blat.dart', csKind: CompletionSuggestionKind.IMPORT);
   }
 
   test_import_package() {
@@ -175,7 +181,7 @@ class ImportUriContributorTest extends AbstractCompletionTest {
   }
 
   test_part_file() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -187,13 +193,14 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     expect(request.replacementLength, 0);
     assertNotSuggested('completion.dart');
     assertSuggest('other.dart', csKind: CompletionSuggestionKind.IMPORT);
-    assertSuggest('foo/', csKind: CompletionSuggestionKind.IMPORT);
-    assertNotSuggested('foo/bar.dart');
-    assertNotSuggested('../blat.dart');
+    assertNotSuggested('foo');
+    assertSuggest('foo${separator}', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('foo${separator}bar.dart');
+    assertNotSuggested('..${separator}blat.dart');
   }
 
   test_part_file2() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -205,13 +212,14 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     expect(request.replacementLength, 2);
     assertNotSuggested('completion.dart');
     assertSuggest('other.dart', csKind: CompletionSuggestionKind.IMPORT);
-    assertSuggest('foo/', csKind: CompletionSuggestionKind.IMPORT);
-    assertNotSuggested('foo/bar.dart');
-    assertNotSuggested('../blat.dart');
+    assertNotSuggested('foo');
+    assertSuggest('foo${separator}', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('foo${separator}bar.dart');
+    assertNotSuggested('..${separator}blat.dart');
   }
 
   test_part_file_child() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -224,12 +232,13 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     assertNotSuggested('completion.dart');
     assertNotSuggested('other.dart');
     assertNotSuggested('foo');
-    assertSuggest('foo/bar.dart', csKind: CompletionSuggestionKind.IMPORT);
-    assertNotSuggested('../blat.dart');
+    assertNotSuggested('foo${separator}');
+    assertSuggest('foo${separator}bar.dart', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('..${separator}blat.dart');
   }
 
   test_part_file_parent() {
-    // TODO(danrubel) fix file uri discovery on Windows
+    // TODO(danrubel) fix file uri suggestions on Windows
     if (Platform.isWindows) return;
     testFile = '/proj/completion.dart';
     addSource('/proj/other.dart', 'library other;');
@@ -242,7 +251,8 @@ class ImportUriContributorTest extends AbstractCompletionTest {
     assertNotSuggested('completion.dart');
     assertNotSuggested('other.dart');
     assertNotSuggested('foo');
-    assertNotSuggested('foo/bar.dart');
-    assertSuggest('../blat.dart', csKind: CompletionSuggestionKind.IMPORT);
+    assertNotSuggested('foo${separator}');
+    assertNotSuggested('foo${separator}bar.dart');
+    assertSuggest('..${separator}blat.dart', csKind: CompletionSuggestionKind.IMPORT);
   }
 }
