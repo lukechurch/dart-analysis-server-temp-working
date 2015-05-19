@@ -107,8 +107,8 @@ class FixProcessor {
     errorLength = error.length;
     errorEnd = errorOffset + errorLength;
     errorRange = new SourceRange(errorOffset, errorLength);
-    node = new NodeLocator.con1(errorOffset).searchWithin(unit);
-    coveredNode = new NodeLocator.con2(errorOffset, errorOffset + errorLength)
+    node = new NodeLocator(errorOffset).searchWithin(unit);
+    coveredNode = new NodeLocator(errorOffset, errorOffset + errorLength)
         .searchWithin(unit);
     // analyze ErrorCode
     ErrorCode errorCode = error.errorCode;
@@ -562,10 +562,9 @@ class FixProcessor {
     ClassDeclaration targetClassNode =
         targetConstructor.parent as ClassDeclaration;
     ClassElement targetClassElement = targetClassNode.element;
-    ClassElement superClassElement = targetClassElement.supertype.element;
+    InterfaceType superType = targetClassElement.supertype;
     // add proposals for all super constructors
-    List<ConstructorElement> superConstructors = superClassElement.constructors;
-    for (ConstructorElement superConstructor in superConstructors) {
+    for (ConstructorElement superConstructor in superType.constructors) {
       String constructorName = superConstructor.name;
       // skip private
       if (Identifier.isPrivateName(constructorName)) {
@@ -626,11 +625,11 @@ class FixProcessor {
   void _addFix_createConstructorSuperImplicit() {
     ClassDeclaration targetClassNode = node.parent as ClassDeclaration;
     ClassElement targetClassElement = targetClassNode.element;
-    ClassElement superClassElement = targetClassElement.supertype.element;
+    InterfaceType superType = targetClassElement.supertype;
     String targetClassName = targetClassElement.name;
     // add proposals for all super constructors
-    List<ConstructorElement> superConstructors = superClassElement.constructors;
-    for (ConstructorElement superConstructor in superConstructors) {
+    for (ConstructorElement superConstructor in superType.constructors) {
+      superConstructor = ConstructorMember.from(superConstructor, superType);
       String constructorName = superConstructor.name;
       // skip private
       if (Identifier.isPrivateName(constructorName)) {
@@ -813,7 +812,7 @@ class FixProcessor {
       DartType parameterType = parameterElement.type;
       if (parameterType is InterfaceType && parameterType.isDartCoreFunction) {
         ExecutableElement element = new MethodElementImpl('', -1);
-        parameterType = new FunctionTypeImpl.con1(element);
+        parameterType = new FunctionTypeImpl(element);
       }
       if (parameterType is! FunctionType) {
         return;
@@ -923,7 +922,6 @@ class FixProcessor {
           String libName = removeEnd(source.shortName, '.dart');
           libName = libName.replaceAll('_', '.');
           SourceEdit edit = new SourceEdit(0, 0, 'library $libName;$eol$eol');
-          change.addEdit(file, -1, edit);
           doSourceChange_addSourceEdit(change, context, source, edit);
         }
         _addFix(DartFixKind.CREATE_FILE, [file]);
@@ -1128,7 +1126,6 @@ class FixProcessor {
         String file = source.fullName;
         String libName = unitLibraryElement.name;
         SourceEdit edit = new SourceEdit(0, 0, 'part of $libName;$eol$eol');
-        change.addEdit(file, -1, edit);
         doSourceChange_addSourceEdit(change, context, source, edit);
         _addFix(DartFixKind.CREATE_FILE, [file]);
       }

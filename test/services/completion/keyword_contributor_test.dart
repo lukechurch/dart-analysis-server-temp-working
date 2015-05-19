@@ -179,10 +179,17 @@ class KeywordContributorTest extends AbstractCompletionTest {
     Set<String> actualCompletions = new Set<String>();
     expectedCompletions.addAll(expectedKeywords.map((k) => k.syntax));
     expectedCompletions.addAll(pseudoKeywords);
+    if (expectedCompletions.contains(Keyword.IMPORT.syntax)) {
+      expectedCompletions.remove(Keyword.IMPORT.syntax);
+      expectedCompletions.add("import '';");
+      expectedCompletions.add("import '' as ;");
+      expectedCompletions.add("import '' hide ;");
+      expectedCompletions.add("import '' show ;");
+    }
     for (CompletionSuggestion s in request.suggestions) {
       if (s.kind == CompletionSuggestionKind.KEYWORD) {
         Keyword k = Keyword.keywords[s.completion];
-        if (k == null && !pseudoKeywords.contains(s.completion)) {
+        if (k == null && !expectedCompletions.contains(s.completion)) {
           fail('Invalid keyword suggested: ${s.completion}');
         } else {
           if (!actualCompletions.add(s.completion)) {
@@ -201,8 +208,22 @@ class KeywordContributorTest extends AbstractCompletionTest {
     }
     for (CompletionSuggestion s in request.suggestions) {
       if (s.kind == CompletionSuggestionKind.KEYWORD) {
-        expect(s.relevance, equals(relevance), reason: s.completion);
-        expect(s.selectionOffset, equals(s.completion.length));
+        if (s.completion.startsWith(Keyword.IMPORT.syntax)) {
+          int importRelevance = relevance;
+          if (importRelevance == DART_RELEVANCE_HIGH &&
+              s.completion == "import '';") {
+            ++importRelevance;
+          }
+          expect(s.relevance, equals(importRelevance), reason: s.completion);
+          expect(s.selectionOffset, equals(Keyword.IMPORT.syntax.length + 2));
+        } else {
+          if (s.completion == Keyword.RETHROW.syntax) {
+            expect(s.relevance, equals(relevance - 1), reason: s.completion);
+          } else {
+            expect(s.relevance, equals(relevance), reason: s.completion);
+          }
+          expect(s.selectionOffset, equals(s.completion.length));
+        }
         expect(s.selectionLength, equals(0));
         expect(s.isDeprecated, equals(false));
         expect(s.isPotential, equals(false));
@@ -239,6 +260,25 @@ class KeywordContributorTest extends AbstractCompletionTest {
     expect(computeFast(), isTrue);
     assertSuggestKeywords(DIRECTIVE_AND_DECLARATION_KEYWORDS,
         relevance: DART_RELEVANCE_HIGH);
+  }
+
+  test_anonymous_function_async() {
+    addTestSource('main() {foo(() ^ {}}}');
+    expect(computeFast(), isTrue);
+    assertSuggestKeywords([],
+        pseudoKeywords: ['async'], relevance: DART_RELEVANCE_HIGH);
+  }
+
+  test_anonymous_function_async2() {
+    addTestSource('main() {foo(() a^ {}}}');
+    expect(computeFast(), isTrue);
+    assertSuggestKeywords(STMT_START_OUTSIDE_CLASS, pseudoKeywords: ['async']);
+  }
+
+  test_anonymous_function_async3() {
+    addTestSource('main() {foo(() async ^ {}}}');
+    expect(computeFast(), isTrue);
+    assertSuggestKeywords([]);
   }
 
   test_argument() {
@@ -861,6 +901,24 @@ class A {
     addTestSource('class A { foo() async => ^;}');
     expect(computeFast(), isTrue);
     assertSuggestKeywords(EXPRESSION_START_INSTANCE, pseudoKeywords: ['await']);
+  }
+
+  test_method_body_expression1() {
+    addTestSource('class A { foo() {return b == true ? ^}}');
+    expect(computeFast(), isTrue);
+    assertSuggestKeywords(EXPRESSION_START_INSTANCE);
+  }
+
+  test_method_body_expression2() {
+    addTestSource('class A { foo() {return b == true ? 1 : ^}}');
+    expect(computeFast(), isTrue);
+    assertSuggestKeywords(EXPRESSION_START_INSTANCE);
+  }
+
+  test_method_body_return() {
+    addTestSource('class A { foo() {return ^}}');
+    expect(computeFast(), isTrue);
+    assertSuggestKeywords(EXPRESSION_START_INSTANCE);
   }
 
   test_method_param() {
