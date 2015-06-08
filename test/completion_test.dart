@@ -984,7 +984,7 @@ main() {
 enum MyEnum {A, B, C}
 main() {
   MyEnum.!1;
-}''', <String>["1+values", "1+A", "1+B", "1+C"], failingTests: '1');
+}''', <String>["1+values", "1+A", "1+B", "1+C"]);
 
     buildTests('testCompletion_exactPrefix_hasHigherRelevance', '''
 var STR;
@@ -1421,7 +1421,7 @@ class B extends A {
   main() {
     super.!1
   }
-}''', <String>["1+fa", "1-fb", "1+ma", "1-mb"], failingTests: '1');
+}''', <String>["1+fa", "1-fb", "1+ma", "1-mb"]);
 
     buildTests('testCompletion_superConstructorInvocation_noNamePrefix', '''
 class A {
@@ -1982,19 +1982,18 @@ class Q {
 
     // keywords
     buildTests('test017', '''
-!1library foo;
-!2import 'x' !5as r;
+!1!2import 'x' !5as r;
 !3export '!8uri' !6hide Q !7show X;
 !4part 'x';''', <String>[
       "1+library",
-      "2+import",
+      "2+import '!';",
       "3+export",
       "4+part",
       "5+as",
       "6+hide",
       "7+show",
       "8-null"
-    ], failingTests: '1567');
+    ], failingTests: '567');
 
     // keywords
     buildTests('test018', '''!1part !2of foo;''', <String>["1+part", "2+of"],

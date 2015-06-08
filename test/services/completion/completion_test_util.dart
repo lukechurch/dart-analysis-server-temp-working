@@ -65,7 +65,8 @@ abstract class AbstractCompletionTest extends AbstractContextTest {
         content.substring(completionOffset + 1);
     testSource = addSource(testFile, content);
     cache = new DartCompletionCache(context, testSource);
-    AnalysisServer server = new AnalysisServerMock(searchEngine: searchEngine, resourceProvider: provider);
+    AnalysisServer server = new AnalysisServerMock(
+        searchEngine: searchEngine, resourceProvider: provider);
     request = new DartCompletionRequest(
         server, context, testSource, completionOffset, cache);
   }
@@ -552,6 +553,24 @@ abstract class AbstractSelectorSuggestionTest extends AbstractCompletionTest {
     // Subclasses override
   }
 
+  CompletionSuggestion assertSuggestEnum(String completion,
+      {bool isDeprecated: false}) {
+    CompletionSuggestion suggestion =
+        assertSuggest(completion, isDeprecated: isDeprecated);
+    expect(suggestion.isDeprecated, isDeprecated);
+    expect(suggestion.element.kind, protocol.ElementKind.ENUM);
+    return suggestion;
+  }
+
+  CompletionSuggestion assertSuggestEnumConst(String completion,
+      {bool isDeprecated: false}) {
+    CompletionSuggestion suggestion =
+        assertSuggest(completion, isDeprecated: isDeprecated);
+    expect(suggestion.isDeprecated, isDeprecated);
+    expect(suggestion.element.kind, protocol.ElementKind.ENUM_CONSTANT);
+    return suggestion;
+  }
+
   CompletionSuggestion assertSuggestImportedClass(String name,
       {CompletionSuggestionKind kind: CompletionSuggestionKind.INVOCATION,
       int relevance: DART_RELEVANCE_DEFAULT, String importUri}) {
@@ -634,7 +653,7 @@ abstract class AbstractSelectorSuggestionTest extends AbstractCompletionTest {
 
   CompletionSuggestion assertSuggestInvocationMethod(
       String name, String declaringType, String returnType,
-      [int relevance = DART_RELEVANCE_DEFAULT]) {
+      {int relevance: DART_RELEVANCE_DEFAULT}) {
     if (contributor is PrefixedElementContributor) {
       return assertSuggestMethod(name, declaringType, returnType,
           relevance: relevance);

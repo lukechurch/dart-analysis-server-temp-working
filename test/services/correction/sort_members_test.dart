@@ -385,6 +385,30 @@ main() {
 ''');
   }
 
+  void test_directives_imports_packageAndPath() {
+    _parseTestUnit(r'''
+library lib;
+
+import 'package:product.ui.api.bbb/manager1.dart';
+import 'package:product.ui.api/entity2.dart';
+import 'package:product.ui/entity.dart';
+import 'package:product.ui.api.aaa/manager2.dart';
+import 'package:product.ui.api/entity1.dart';
+import 'package:product2.client/entity.dart';
+''');
+    // validate change
+    _assertSort(r'''
+library lib;
+
+import 'package:product.ui/entity.dart';
+import 'package:product.ui.api/entity1.dart';
+import 'package:product.ui.api/entity2.dart';
+import 'package:product.ui.api.aaa/manager2.dart';
+import 'package:product.ui.api.bbb/manager1.dart';
+import 'package:product2.client/entity.dart';
+''');
+  }
+
   void test_unitMembers_class() {
     _parseTestUnit(r'''
 class C {}
@@ -476,6 +500,36 @@ class A {}
 class A {}
 
 class B {}
+''');
+  }
+
+  void test_unitMembers_enum() {
+    _parseTestUnit(r'''
+enum C {x, y}
+enum A {x, y}
+enum B {x, y}
+''');
+    // validate change
+    _assertSort(r'''
+enum A {x, y}
+enum B {x, y}
+enum C {x, y}
+''');
+  }
+
+  void test_unitMembers_enumClass() {
+    _parseTestUnit(r'''
+enum C {x, y}
+class A {}
+class D {}
+enum B {x, y}
+''');
+    // validate change
+    _assertSort(r'''
+class A {}
+enum B {x, y}
+enum C {x, y}
+class D {}
 ''');
   }
 

@@ -174,7 +174,7 @@ void sendAnalysisNotificationOverrides(
  */
 void setCacheSize(AnalysisContext context, int cacheSize) {
   AnalysisOptionsImpl options =
-      new AnalysisOptionsImpl.con1(context.analysisOptions);
+      new AnalysisOptionsImpl.from(context.analysisOptions);
   options.cacheSize = cacheSize;
   context.analysisOptions = options;
 }
@@ -326,8 +326,12 @@ class _DartIndexOperation extends _SingleFileOperation {
   @override
   void perform(AnalysisServer server) {
     ServerPerformanceStatistics.indexOperation.makeCurrentWhile(() {
-      Index index = server.index;
-      index.indexUnit(context, unit);
+      try {
+        Index index = server.index;
+        index.indexUnit(context, unit);
+      } catch (exception, stackTrace) {
+        server.sendServerErrorNotification(exception, stackTrace);
+      }
     });
   }
 }

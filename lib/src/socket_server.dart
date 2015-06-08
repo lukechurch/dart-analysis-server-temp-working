@@ -71,21 +71,14 @@ class SocketServer {
     Index index = null;
     if (!analysisServerOptions.noIndex) {
       index = createLocalFileIndex();
+      index.contributors = serverPlugin.indexContributors;
       index.run();
     }
 
     analysisServer = new AnalysisServer(serverChannel, resourceProvider,
-        new OptimizingPubPackageMapProvider(resourceProvider, defaultSdk), index,
-        analysisServerOptions, defaultSdk, instrumentationService,
-        rethrowExceptions: false);
-    _initializeHandlers(analysisServer);
+        new OptimizingPubPackageMapProvider(resourceProvider, defaultSdk),
+        index, serverPlugin, analysisServerOptions, defaultSdk,
+        instrumentationService, rethrowExceptions: false);
     analysisServer.userDefinedPlugins = userDefinedPlugins;
-  }
-
-  /**
-   * Initialize the handlers to be used by the given [server].
-   */
-  void _initializeHandlers(AnalysisServer server) {
-    server.handlers = serverPlugin.createDomains(server);
   }
 }

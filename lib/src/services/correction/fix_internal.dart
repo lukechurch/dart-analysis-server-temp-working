@@ -107,8 +107,8 @@ class FixProcessor {
     errorLength = error.length;
     errorEnd = errorOffset + errorLength;
     errorRange = new SourceRange(errorOffset, errorLength);
-    node = new NodeLocator.con1(errorOffset).searchWithin(unit);
-    coveredNode = new NodeLocator.con2(errorOffset, errorOffset + errorLength)
+    node = new NodeLocator(errorOffset).searchWithin(unit);
+    coveredNode = new NodeLocator(errorOffset, errorOffset + errorLength)
         .searchWithin(unit);
     // analyze ErrorCode
     ErrorCode errorCode = error.errorCode;
@@ -142,6 +142,9 @@ class FixProcessor {
     if (errorCode ==
         CompileTimeErrorCode.NO_DEFAULT_SUPER_CONSTRUCTOR_IMPLICIT) {
       _addFix_createConstructorSuperImplicit();
+    }
+    if (errorCode == CompileTimeErrorCode.PART_OF_NON_PART) {
+      _addFix_addPartOfDirective();
     }
     if (errorCode ==
         CompileTimeErrorCode.UNDEFINED_CONSTRUCTOR_IN_INITIALIZER_DEFAULT) {
@@ -199,6 +202,7 @@ class FixProcessor {
     }
     if (errorCode == StaticWarningCode.EXTRA_POSITIONAL_ARGUMENTS) {
       _addFix_createConstructor_insteadOfSyntheticDefault();
+      _addFix_addMissingParameter();
     }
     if (errorCode == StaticWarningCode.NEW_WITH_UNDEFINED_CONSTRUCTOR) {
       _addFix_createConstructor_named();
@@ -344,6 +348,89 @@ class FixProcessor {
     return false;
   }
 
+  void _addFix_addMissingParameter() {
+    if (node is SimpleIdentifier && node.parent is MethodInvocation) {
+      MethodInvocation invocation = node.parent;
+      SimpleIdentifier methodName = invocation.methodName;
+      ArgumentList argumentList = invocation.argumentList;
+      if (methodName == node && argumentList != null) {
+        Element targetElement = methodName.bestElement;
+        List<Expression> arguments = argumentList.arguments;
+        if (targetElement is ExecutableElement) {
+          List<ParameterElement> parameters = targetElement.parameters;
+          int numParameters = parameters.length;
+          Expression argument = arguments[numParameters];
+          // prepare target
+          int targetOffset;
+          if (numParameters != 0) {
+            ParameterElement parameterElement = parameters.last;
+            AstNode parameterNode = parameterElement.computeNode();
+            targetOffset = parameterNode.end;
+          } else {
+            AstNode targetNode = targetElement.computeNode();
+            if (targetNode is FunctionDeclaration) {
+              FunctionExpression function = targetNode.functionExpression;
+              targetOffset = function.parameters.leftParenthesis.end;
+            } else if (targetNode is MethodDeclaration) {
+              targetOffset = targetNode.parameters.leftParenthesis.end;
+            } else {
+              return;
+            }
+          }
+          String targetFile = targetElement.source.fullName;
+          // required
+          {
+            SourceBuilder sb = new SourceBuilder(targetFile, targetOffset);
+            // append source
+            if (numParameters != 0) {
+              sb.append(', ');
+            }
+            _appendParameterForArgument(sb, numParameters, argument);
+            // add proposal
+            _insertBuilder(sb, targetElement);
+            _addFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, []);
+          }
+          // optional positional
+          {
+            SourceBuilder sb = new SourceBuilder(targetFile, targetOffset);
+            // append source
+            if (numParameters != 0) {
+              sb.append(', ');
+            }
+            sb.append('[');
+            _appendParameterForArgument(sb, numParameters, argument);
+            sb.append(']');
+            // add proposal
+            _insertBuilder(sb, targetElement);
+            _addFix(DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL, []);
+          }
+        }
+      }
+    }
+  }
+
+  void _addFix_addPartOfDirective() {
+    if (node is SimpleStringLiteral && node.parent is PartDirective) {
+      PartDirective directive = node.parent;
+      Source partSource = directive.source;
+      CompilationUnit partUnit;
+      if (AnalysisEngine.instance.useTaskModel) {
+        partUnit = context.getResolvedCompilationUnit2(partSource, partSource);
+      } else {
+        partUnit = context.getResolvedCompilationUnit2(partSource, unitSource);
+      }
+      if (partUnit != null) {
+        CorrectionUtils partUtils = new CorrectionUtils(partUnit);
+        CorrectionUtils_InsertDesc desc = partUtils.getInsertDescTop();
+        String libraryName = unitLibraryElement.name;
+        _addInsertEdit(desc.offset,
+            '${desc.prefix}part of $libraryName;$eol${desc.suffix}',
+            partUnit.element);
+        _addFix(DartFixKind.ADD_PART_OF, []);
+      }
+    }
+  }
+
   void _addFix_boolInsteadOfBoolean() {
     SourceRange range = rf.rangeError(error);
     _addReplaceEdit(range, 'bool');
@@ -351,37 +438,81 @@ class FixProcessor {
   }
 
   void _addFix_createClass() {
-    if (_mayBeTypeIdentifier(node)) {
-      String name = (node as SimpleIdentifier).name;
-      // prepare environment
-      CompilationUnitMember enclosingMember =
-          node.getAncestor((node) => node is CompilationUnitMember);
-      int offset = enclosingMember.end;
-      String prefix = '';
-      // prepare source
-      SourceBuilder sb = new SourceBuilder(file, offset);
-      {
-        sb.append('$eol$eol');
-        sb.append(prefix);
-        // "class"
-        sb.append('class ');
-        // append name
-        {
-          sb.startPosition('NAME');
-          sb.append(name);
-          sb.endPosition();
-        }
-        // no members
-        sb.append(' {');
-        sb.append(eol);
-        sb.append('}');
+    Element prefixElement = null;
+    String name = null;
+    if (node is SimpleIdentifier) {
+      AstNode parent = node.parent;
+      if (parent is PrefixedIdentifier) {
+        PrefixedIdentifier prefixedIdentifier = parent;
+        prefixElement = prefixedIdentifier.prefix.staticElement;
+        parent = prefixedIdentifier.parent;
+        name = prefixedIdentifier.identifier.name;
+      } else {
+        name = (node as SimpleIdentifier).name;
       }
-      // insert source
-      _insertBuilder(sb, unitElement);
-      _addLinkedPosition('NAME', sb, rf.rangeNode(node));
-      // add proposal
-      _addFix(DartFixKind.CREATE_CLASS, [name]);
+      if (parent is! TypeName) {
+        return;
+      }
+    } else {
+      return;
     }
+    // prepare environment
+    Element targetUnit;
+    SourceBuilder sb;
+    String prefix = '';
+    String suffix = '';
+    if (prefixElement == null) {
+      targetUnit = unitElement;
+      CompilationUnitMember enclosingMember =
+          node.getAncestor((node) => node.parent is CompilationUnit);
+      if (enclosingMember == null) {
+        return;
+      }
+      int offset = enclosingMember.end;
+      sb = new SourceBuilder(file, offset);
+      prefix = '$eol$eol';
+    } else {
+      for (ImportElement import in unitLibraryElement.imports) {
+        if (prefixElement is PrefixElement && import.prefix == prefixElement) {
+          targetUnit = import.importedLibrary.definingCompilationUnit;
+          Source targetSource = targetUnit.source;
+          int offset = targetSource.contents.data.length;
+          sb = new SourceBuilder(targetSource.fullName, offset);
+          prefix = '$eol';
+          suffix = '$eol';
+          break;
+        }
+      }
+      if (sb == null) {
+        return;
+      }
+    }
+    // prepare source
+    {
+      sb.append(prefix);
+      // "class"
+      sb.append('class ');
+      // append name
+      if (prefixElement == null) {
+        sb.startPosition('NAME');
+        sb.append(name);
+        sb.endPosition();
+      } else {
+        sb.append(name);
+      }
+      // no members
+      sb.append(' {');
+      sb.append(eol);
+      sb.append('}');
+      sb.append(suffix);
+    }
+    // insert source
+    _insertBuilder(sb, targetUnit);
+    if (prefixElement == null) {
+      _addLinkedPosition('NAME', sb, rf.rangeNode(node));
+    }
+    // add proposal
+    _addFix(DartFixKind.CREATE_CLASS, [name]);
   }
 
   /**
@@ -562,10 +693,9 @@ class FixProcessor {
     ClassDeclaration targetClassNode =
         targetConstructor.parent as ClassDeclaration;
     ClassElement targetClassElement = targetClassNode.element;
-    ClassElement superClassElement = targetClassElement.supertype.element;
+    InterfaceType superType = targetClassElement.supertype;
     // add proposals for all super constructors
-    List<ConstructorElement> superConstructors = superClassElement.constructors;
-    for (ConstructorElement superConstructor in superConstructors) {
+    for (ConstructorElement superConstructor in superType.constructors) {
       String constructorName = superConstructor.name;
       // skip private
       if (Identifier.isPrivateName(constructorName)) {
@@ -626,11 +756,11 @@ class FixProcessor {
   void _addFix_createConstructorSuperImplicit() {
     ClassDeclaration targetClassNode = node.parent as ClassDeclaration;
     ClassElement targetClassElement = targetClassNode.element;
-    ClassElement superClassElement = targetClassElement.supertype.element;
+    InterfaceType superType = targetClassElement.supertype;
     String targetClassName = targetClassElement.name;
     // add proposals for all super constructors
-    List<ConstructorElement> superConstructors = superClassElement.constructors;
-    for (ConstructorElement superConstructor in superConstructors) {
+    for (ConstructorElement superConstructor in superType.constructors) {
+      superConstructor = ConstructorMember.from(superConstructor, superType);
       String constructorName = superConstructor.name;
       // skip private
       if (Identifier.isPrivateName(constructorName)) {
@@ -813,7 +943,7 @@ class FixProcessor {
       DartType parameterType = parameterElement.type;
       if (parameterType is InterfaceType && parameterType.isDartCoreFunction) {
         ExecutableElement element = new MethodElementImpl('', -1);
-        parameterType = new FunctionTypeImpl.con1(element);
+        parameterType = new FunctionTypeImpl(element);
       }
       if (parameterType is! FunctionType) {
         return;
@@ -923,10 +1053,9 @@ class FixProcessor {
           String libName = removeEnd(source.shortName, '.dart');
           libName = libName.replaceAll('_', '.');
           SourceEdit edit = new SourceEdit(0, 0, 'library $libName;$eol$eol');
-          change.addEdit(file, -1, edit);
           doSourceChange_addSourceEdit(change, context, source, edit);
+          _addFix(DartFixKind.CREATE_FILE, [source.shortName]);
         }
-        _addFix(DartFixKind.CREATE_FILE, [file]);
       }
     }
   }
@@ -999,7 +1128,10 @@ class FixProcessor {
       }
       return 1;
     });
+    // prepare target
     ClassDeclaration targetClass = node.parent as ClassDeclaration;
+    utils.targetClassElement = targetClass.element;
+    // prepare SourceBuilder
     int insertOffset = targetClass.end - 1;
     SourceBuilder sb = new SourceBuilder(file, insertOffset);
     // EOL management
@@ -1125,12 +1257,10 @@ class FixProcessor {
       PartDirective partDirective = node.parent;
       Source source = partDirective.source;
       if (source != null) {
-        String file = source.fullName;
         String libName = unitLibraryElement.name;
         SourceEdit edit = new SourceEdit(0, 0, 'part of $libName;$eol$eol');
-        change.addEdit(file, -1, edit);
         doSourceChange_addSourceEdit(change, context, source, edit);
-        _addFix(DartFixKind.CREATE_FILE, [file]);
+        _addFix(DartFixKind.CREATE_FILE, [source.shortName]);
       }
     }
   }
@@ -1770,7 +1900,6 @@ class FixProcessor {
       SourceBuilder sb, ArgumentList argumentList) {
     // append parameters
     sb.append('(');
-    Set<String> excluded = new Set();
     List<Expression> arguments = argumentList.arguments;
     for (int i = 0; i < arguments.length; i++) {
       Expression argument = arguments[i];
@@ -1778,27 +1907,8 @@ class FixProcessor {
       if (i != 0) {
         sb.append(', ');
       }
-      // append type name
-      DartType type = argument.bestType;
-      String typeSource = utils.getTypeSource(type, librariesToImport);
-      if (typeSource != 'dynamic') {
-        sb.startPosition('TYPE$i');
-        sb.append(typeSource);
-        _addSuperTypeProposals(sb, new Set(), type);
-        sb.endPosition();
-        sb.append(' ');
-      }
-      // append parameter name
-      {
-        List<String> suggestions =
-            _getArgumentNameSuggestions(excluded, type, argument, i);
-        String favorite = suggestions[0];
-        excluded.add(favorite);
-        sb.startPosition('ARG$i');
-        sb.append(favorite);
-        sb.addSuggestions(LinkedEditSuggestionKind.PARAMETER, suggestions);
-        sb.endPosition();
-      }
+      // append parameter
+      _appendParameterForArgument(sb, i, argument);
     }
   }
 
@@ -2064,6 +2174,32 @@ class FixProcessor {
   void _addReplaceEdit(SourceRange range, String text, [Element target]) {
     SourceEdit edit = new SourceEdit(range.offset, range.length, text);
     _addEdit(target, edit);
+  }
+
+  void _appendParameterForArgument(
+      SourceBuilder sb, int index, Expression argument) {
+    // append type name
+    DartType type = argument.bestType;
+    String typeSource = utils.getTypeSource(type, librariesToImport);
+    if (typeSource != 'dynamic') {
+      sb.startPosition('TYPE$index');
+      sb.append(typeSource);
+      _addSuperTypeProposals(sb, new Set(), type);
+      sb.endPosition();
+      sb.append(' ');
+    }
+    // append parameter name
+    {
+      Set<String> excluded = new Set<String>();
+      List<String> suggestions =
+          _getArgumentNameSuggestions(excluded, type, argument, index);
+      String favorite = suggestions[0];
+      excluded.add(favorite);
+      sb.startPosition('ARG$index');
+      sb.append(favorite);
+      sb.addSuggestions(LinkedEditSuggestionKind.PARAMETER, suggestions);
+      sb.endPosition();
+    }
   }
 
   void _appendParameters(SourceBuilder sb, List<ParameterElement> parameters) {

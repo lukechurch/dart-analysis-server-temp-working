@@ -8,12 +8,14 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math' show max;
 
+import 'package:analysis_server/plugin/analyzed_files.dart';
 import 'package:analysis_server/src/analysis_logger.dart';
 import 'package:analysis_server/src/channel/channel.dart';
 import 'package:analysis_server/src/context_manager.dart';
 import 'package:analysis_server/src/operation/operation.dart';
 import 'package:analysis_server/src/operation/operation_analysis.dart';
 import 'package:analysis_server/src/operation/operation_queue.dart';
+import 'package:analysis_server/src/plugin/server_plugin.dart';
 import 'package:analysis_server/src/protocol.dart' hide Element;
 import 'package:analysis_server/src/services/correction/namespace.dart';
 import 'package:analysis_server/src/services/index/index.dart';
@@ -21,6 +23,8 @@ import 'package:analysis_server/src/services/search/search_engine.dart';
 import 'package:analysis_server/src/source/optimizing_pub_package_map_provider.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
+import 'package:analyzer/src/context/cache.dart';
+import 'package:analyzer/src/context/context.dart' as newContext;
 import 'package:analyzer/src/generated/ast.dart';
 import 'package:analyzer/src/generated/element.dart';
 import 'package:analyzer/src/generated/engine.dart';
@@ -29,6 +33,8 @@ import 'package:analyzer/src/generated/sdk.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/generated/source_io.dart';
 import 'package:analyzer/src/generated/utilities_general.dart';
+import 'package:analyzer/src/task/dart.dart';
+import 'package:analyzer/task/dart.dart';
 import 'package:plugin/plugin.dart';
 
 typedef void OptionUpdater(AnalysisOptionsImpl options);
@@ -66,7 +72,7 @@ class AnalysisServer {
    * The version of the analysis server. The value should be replaced
    * automatically during the build.
    */
-  static final String VERSION = '1.6.2';
+  static final String VERSION = '1.7.0';
 
   /**
    * The number of milliseconds to perform operations before inserting
@@ -95,6 +101,11 @@ class AnalysisServer {
    * The [SearchEngine] for this server, may be `null` if indexing is disabled.
    */
   final SearchEngine searchEngine;
+
+  /**
+   * The plugin associated with this analysis server.
+   */
+  final ServerPlugin serverPlugin;
 
   /**
    * [ContextManager] which handles the mapping from analysis roots
@@ -250,8 +261,9 @@ class AnalysisServer {
    */
   AnalysisServer(this.channel, this.resourceProvider,
       OptimizingPubPackageMapProvider packageMapProvider, Index _index,
-      AnalysisServerOptions analysisServerOptions, this.defaultSdk,
-      this.instrumentationService, {this.rethrowExceptions: true})
+      this.serverPlugin, AnalysisServerOptions analysisServerOptions,
+      this.defaultSdk, this.instrumentationService,
+      {this.rethrowExceptions: true})
       : index = _index,
         searchEngine = _index != null ? createSearchEngine(_index) : null {
     _performance = performanceDuringStartup;
@@ -281,6 +293,7 @@ class AnalysisServer {
         new ServerConnectedParams(VERSION).toNotification();
     channel.sendNotification(notification);
     channel.listen(handleRequest, onDone: done, onError: error);
+    handlers = serverPlugin.createDomains(this);
   }
 
   /**
@@ -425,9 +438,10 @@ class AnalysisServer {
    * first context that implicitly analyzes it.
    *
    * If the [path] is not analyzed by any context, a [ContextSourcePair] with
-   * `null` context and `file` [Source] is returned.
+   * a `null` context and `file` [Source] is returned.
    *
-   * If the [path] dosn't represent a file, `null` is returned as a [Source].
+   * If the [path] dosn't represent a file, a [ContextSourcePair] with a `null`
+   * context and `null` [Source] is returned.
    *
    * Does not return `null`.
    */
@@ -443,21 +457,21 @@ class AnalysisServer {
     }
     // try to find the deep-most containing context
     Resource resource = resourceProvider.getResource(path);
-    File file = resource is File ? resource : null;
+    if (resource is! File) {
+      return new ContextSourcePair(null, null);
+    }
+    File file = resource;
     {
       AnalysisContext containingContext = getContainingContext(path);
       if (containingContext != null) {
-        Source source = file != null
-            ? ContextManager.createSourceInContext(containingContext, file)
-            : null;
+        Source source =
+            ContextManager.createSourceInContext(containingContext, file);
         return new ContextSourcePair(containingContext, source);
       }
     }
     // try to find a context that analysed the file
     for (AnalysisContext context in folderMap.values) {
-      Source source = file != null
-          ? ContextManager.createSourceInContext(context, file)
-          : null;
+      Source source = ContextManager.createSourceInContext(context, file);
       SourceKind kind = context.getKindOf(source);
       if (kind != SourceKind.UNKNOWN) {
         return new ContextSourcePair(context, source);
@@ -472,7 +486,7 @@ class AnalysisServer {
       }
     }
     // file-based source
-    Source fileSource = file != null ? file.createSource() : null;
+    Source fileSource = file.createSource();
     return new ContextSourcePair(null, fileSource);
   }
 
@@ -531,7 +545,7 @@ class AnalysisServer {
     if (context == null) {
       return null;
     }
-    if (!source.exists()) {
+    if (!context.exists(source)) {
       return null;
     }
     return context.getErrors(source);
@@ -563,7 +577,7 @@ class AnalysisServer {
     List<CompilationUnit> units = getResolvedCompilationUnits(file);
     List<AstNode> nodes = <AstNode>[];
     for (CompilationUnit unit in units) {
-      AstNode node = new NodeLocator.con1(offset).searchWithin(unit);
+      AstNode node = new NodeLocator(offset).searchWithin(unit);
       if (node != null) {
         nodes.add(node);
       }
@@ -978,7 +992,7 @@ class AnalysisServer {
     folderMap.forEach((Folder folder, AnalysisContext context) {
       List<Source> sourceList = sourceMap[context];
       if (sourceList == null) {
-        sourceList = Source.EMPTY_ARRAY;
+        sourceList = Source.EMPTY_LIST;
       }
       context.analysisPriorityOrder = sourceList;
       // Schedule the context for analysis so that it has the opportunity to
@@ -1015,10 +1029,21 @@ class AnalysisServer {
   void test_flushResolvedUnit(String file) {
     if (AnalysisEngine.isDartFileName(file)) {
       ContextSourcePair contextSource = getContextSourcePair(file);
-      AnalysisContextImpl context = contextSource.context;
+      AnalysisContext context = contextSource.context;
       Source source = contextSource.source;
-      DartEntry dartEntry = context.getReadableSourceEntryOrNull(source);
-      dartEntry.flushAstStructures();
+      if (context is AnalysisContextImpl) {
+        DartEntry dartEntry = context.getReadableSourceEntryOrNull(source);
+        dartEntry.flushAstStructures();
+      } else if (context is newContext.AnalysisContextImpl) {
+        CacheEntry entry = context.getCacheEntry(source);
+        entry.setState(RESOLVED_UNIT1, CacheState.FLUSHED);
+        entry.setState(RESOLVED_UNIT2, CacheState.FLUSHED);
+        entry.setState(RESOLVED_UNIT3, CacheState.FLUSHED);
+        entry.setState(RESOLVED_UNIT4, CacheState.FLUSHED);
+        entry.setState(RESOLVED_UNIT5, CacheState.FLUSHED);
+        entry.setState(RESOLVED_UNIT6, CacheState.FLUSHED);
+        entry.setState(RESOLVED_UNIT, CacheState.FLUSHED);
+      }
     }
   }
 
@@ -1138,7 +1163,7 @@ class AnalysisServer {
     //
     folderMap.forEach((Folder folder, AnalysisContext context) {
       AnalysisOptionsImpl options =
-          new AnalysisOptionsImpl.con1(context.analysisOptions);
+          new AnalysisOptionsImpl.from(context.analysisOptions);
       optionUpdaters.forEach((OptionUpdater optionUpdater) {
         optionUpdater(options);
       });
@@ -1320,7 +1345,7 @@ class ServerContextManager extends ContextManager {
     context.contentCache = analysisServer.overlayState;
     analysisServer.folderMap[folder] = context;
     context.sourceFactory = _createSourceFactory(packageUriResolver);
-    context.analysisOptions = new AnalysisOptionsImpl.con1(defaultOptions);
+    context.analysisOptions = new AnalysisOptionsImpl.from(defaultOptions);
     _onContextsChangedController
         .add(new ContextsChangedEvent(added: [context]));
     analysisServer.schedulePerformAnalysisOperation(context);
@@ -1370,6 +1395,24 @@ class ServerContextManager extends ContextManager {
     analysisServer.sendContextAnalysisDoneNotifications(
         context, AnalysisDoneReason.CONTEXT_REMOVED);
     context.dispose();
+  }
+
+  @override
+  bool shouldFileBeAnalyzed(File file) {
+    List<ShouldAnalyzeFile> functions =
+        analysisServer.serverPlugin.analyzeFileFunctions;
+    for (ShouldAnalyzeFile shouldAnalyzeFile in functions) {
+      if (shouldAnalyzeFile(file)) {
+        // Emacs creates dummy links to track the fact that a file is open for
+        // editing and has unsaved changes (e.g. having unsaved changes to
+        // 'foo.dart' causes a link '.#foo.dart' to be created, which points to
+        // the non-existent file 'username@hostname.pid'. To avoid these dummy
+        // links causing the analyzer to thrash, just ignore links to
+        // non-existent files.
+        return file.exists;
+      }
+    }
+    return false;
   }
 
   @override
