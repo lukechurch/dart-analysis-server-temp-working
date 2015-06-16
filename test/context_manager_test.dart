@@ -926,7 +926,7 @@ class TestContextManager extends ContextManager {
   /**
    * The analysis context that was created.
    */
-  AnalysisContextImpl currentContext;
+  AnalysisContext currentContext;
 
   /**
    * Map from context to the timestamp when the context was created.
@@ -970,7 +970,7 @@ class TestContextManager extends ContextManager {
     currentContextFilePaths[path] = <String, int>{};
     currentContextSources[path] = new HashSet<Source>();
     currentContextPackageUriResolvers[path] = packageUriResolver;
-    currentContext = new AnalysisContextImpl();
+    currentContext = AnalysisEngine.instance.createAnalysisContext();
     currentContext.sourceFactory = new SourceFactory(
         packageUriResolver == null ? [] : [packageUriResolver]);
     return currentContext;
@@ -1016,6 +1016,20 @@ class TestContextManager extends ContextManager {
     currentContextFilePaths.remove(path);
     currentContextSources.remove(path);
     currentContextPackageUriResolvers.remove(path);
+  }
+
+  @override
+  bool shouldFileBeAnalyzed(File file) {
+    if (!(AnalysisEngine.isDartFileName(file.path) ||
+        AnalysisEngine.isHtmlFileName(file.path))) {
+      return false;
+    }
+    // Emacs creates dummy links to track the fact that a file is open for
+    // editing and has unsaved changes (e.g. having unsaved changes to
+    // 'foo.dart' causes a link '.#foo.dart' to be created, which points to the
+    // non-existent file 'username@hostname.pid'.  To avoid these dummy links
+    // causing the analyzer to thrash, just ignore links to non-existent files.
+    return file.exists;
   }
 
   @override

@@ -105,7 +105,7 @@ Expression climbPropertyAccess(AstNode node) {
  * Returns the absolute (non-file) URI or `null`.
  */
 String findAbsoluteUri(AnalysisContext context, String path) {
-  Source fileSource = new NonExistingSource(path, UriKind.FILE_URI);
+  Source fileSource = new NonExistingSource(path, null, UriKind.FILE_URI);
   Uri uri = context.sourceFactory.restoreUri(fileSource);
   if (uri == null) {
     return null;
@@ -442,7 +442,7 @@ AstNode getParsedClassElementNode(ClassElement classElement) {
       classElement.getAncestor((e) => e is CompilationUnitElement);
   CompilationUnit unit = getParsedUnit(unitElement);
   int offset = classElement.nameOffset;
-  AstNode classNameNode = new NodeLocator.con1(offset).searchWithin(unit);
+  AstNode classNameNode = new NodeLocator(offset).searchWithin(unit);
   if (classElement.isEnum) {
     return classNameNode.getAncestor((node) => node is EnumDeclaration);
   } else {
@@ -642,8 +642,7 @@ class CorrectionUtils {
   /**
    * Returns the [AstNode] that encloses the given offset.
    */
-  AstNode findNode(int offset) =>
-      new NodeLocator.con1(offset).searchWithin(unit);
+  AstNode findNode(int offset) => new NodeLocator(offset).searchWithin(unit);
 
   /**
    * Returns names of elements that might conflict with a new local variable
@@ -1031,6 +1030,10 @@ class CorrectionUtils {
    */
   String getTypeSource(DartType type, Set<LibraryElement> librariesToImport) {
     StringBuffer sb = new StringBuffer();
+    // type parameter
+    if (!_isTypeVisible(type)) {
+      return 'dynamic';
+    }
     // just a Function, not FunctionTypeAliasElement
     if (type is FunctionType && type.element is! FunctionTypeAliasElement) {
       return "Function";

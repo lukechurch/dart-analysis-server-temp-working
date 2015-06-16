@@ -69,12 +69,12 @@ class InlineLocalRefactoringImpl extends RefactoringImpl
     RefactoringStatus result = new RefactoringStatus();
     // prepare variable
     {
-      AstNode offsetNode = new NodeLocator.con1(offset).searchWithin(unit);
+      AstNode offsetNode = new NodeLocator(offset).searchWithin(unit);
       if (offsetNode is SimpleIdentifier) {
         Element element = offsetNode.staticElement;
         if (element is LocalVariableElement) {
           _variableElement = element;
-          _variableNode = element.node;
+          _variableNode = element.computeNode();
         }
       }
     }
@@ -100,9 +100,8 @@ class InlineLocalRefactoringImpl extends RefactoringImpl
     for (SearchMatch reference in _references) {
       if (reference.kind != MatchKind.READ) {
         String message = format(
-            "Local variable '{0}' is assigned more than once.", [
-          _variableElement.displayName
-        ]);
+            "Local variable '{0}' is assigned more than once.",
+            [_variableElement.displayName]);
         return new RefactoringStatus.fatal(
             message, newLocation_fromMatch(reference));
       }

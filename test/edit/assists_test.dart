@@ -7,7 +7,6 @@ library test.edit.assists;
 import 'dart:async';
 
 import 'package:analysis_server/src/edit/edit_domain.dart';
-import 'package:analysis_server/src/plugin/server_plugin.dart';
 import 'package:analysis_server/src/protocol.dart';
 import 'package:plugin/manager.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
@@ -42,56 +41,53 @@ class AssistsTest extends AbstractAnalysisTest {
     super.setUp();
     createProject();
     ExtensionManager manager = new ExtensionManager();
-    ServerPlugin plugin = new ServerPlugin();
-    manager.processPlugins([plugin]);
-    handler = new EditDomainHandler(server, plugin);
+    manager.processPlugins([server.serverPlugin]);
+    handler = new EditDomainHandler(server);
   }
 
-  Future test_removeTypeAnnotation() {
+  Future test_removeTypeAnnotation() async {
     addTestFile('''
 main() {
   int v = 1;
 }
 ''');
-    return waitForTasksFinished().then((_) {
-      prepareAssists('v =');
-      _assertHasChange('Remove type annotation', '''
+    await waitForTasksFinished();
+    prepareAssists('v =');
+    _assertHasChange('Remove type annotation', '''
 main() {
   var v = 1;
 }
 ''');
-    });
   }
 
-  Future test_splitVariableDeclaration() {
+  Future test_splitVariableDeclaration() async {
     addTestFile('''
 main() {
   int v = 1;
 }
 ''');
-    return waitForTasksFinished().then((_) {
-      prepareAssists('v =');
-      _assertHasChange('Split variable declaration', '''
+    await waitForTasksFinished();
+    prepareAssists('v =');
+    _assertHasChange('Split variable declaration', '''
 main() {
   int v;
   v = 1;
 }
 ''');
-    });
   }
 
-  Future test_surroundWithIf() {
+  Future test_surroundWithIf() async {
     addTestFile('''
 main() {
   print(1);
   print(2);
 }
 ''');
-    return waitForTasksFinished().then((_) {
-      int offset = findOffset('  print(1)');
-      int length = findOffset('}') - offset;
-      prepareAssistsAt(offset, length);
-      _assertHasChange("Surround with 'if'", '''
+    await waitForTasksFinished();
+    int offset = findOffset('  print(1)');
+    int length = findOffset('}') - offset;
+    prepareAssistsAt(offset, length);
+    _assertHasChange("Surround with 'if'", '''
 main() {
   if (condition) {
     print(1);
@@ -99,7 +95,6 @@ main() {
   }
 }
 ''');
-    });
   }
 
   void _assertHasChange(String message, String expectedCode) {

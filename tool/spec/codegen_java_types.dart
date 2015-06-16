@@ -15,8 +15,7 @@ import 'codegen_tools.dart';
 import 'from_html.dart';
 import 'implied_types.dart';
 
-final String pathToGenTypes =
-    '../../../../editor/tools/plugins/com.google.dart.server/src/com/google/dart/server/generated/types/';
+final String pathToGenTypes = 'generated/java/types/';
 
 final GeneratedDirectory targetDir = new GeneratedDirectory(pathToGenTypes, () {
   Api api = readApi();
@@ -132,7 +131,7 @@ class CodegenJavaType extends CodegenJavaVisitor {
 
   void emitType(TypeDecl type, dom.Element html) {
     outputHeader(javaStyle: true);
-    writeln('package com.google.dart.server.generated.types;');
+    writeln('package org.dartlang.analysis.server.protocol;');
     writeln();
     if (type is TypeObject) {
       _writeTypeObject(type, html);

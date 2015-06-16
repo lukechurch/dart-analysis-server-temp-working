@@ -162,6 +162,139 @@ class Test {
 ''');
   }
 
+  void test_addMissingParameter_function_positional_hasZero() {
+    resolveTestUnit('''
+test() {}
+main() {
+  test(1);
+}
+''');
+    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL, '''
+test([int i]) {}
+main() {
+  test(1);
+}
+''');
+  }
+
+  void test_addMissingParameter_function_required_hasOne() {
+    resolveTestUnit('''
+test(int a) {}
+main() {
+  test(1, 2.0);
+}
+''');
+    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+test(int a, double d) {}
+main() {
+  test(1, 2.0);
+}
+''');
+  }
+
+  void test_addMissingParameter_function_required_hasZero() {
+    resolveTestUnit('''
+test() {}
+main() {
+  test(1);
+}
+''');
+    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+test(int i) {}
+main() {
+  test(1);
+}
+''');
+  }
+
+  void test_addMissingParameter_method_positional_hasOne() {
+    resolveTestUnit('''
+class A {
+  test(int a) {}
+  main() {
+    test(1, 2.0);
+  }
+}
+''');
+    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL, '''
+class A {
+  test(int a, [double d]) {}
+  main() {
+    test(1, 2.0);
+  }
+}
+''');
+  }
+
+  void test_addMissingParameter_method_required_hasOne() {
+    resolveTestUnit('''
+class A {
+  test(int a) {}
+  main() {
+    test(1, 2.0);
+  }
+}
+''');
+    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+class A {
+  test(int a, double d) {}
+  main() {
+    test(1, 2.0);
+  }
+}
+''');
+  }
+
+  void test_addMissingParameter_method_required_hasZero() {
+    resolveTestUnit('''
+class A {
+  test() {}
+  main() {
+    test(1);
+  }
+}
+''');
+    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+class A {
+  test(int i) {}
+  main() {
+    test(1);
+  }
+}
+''');
+  }
+
+  void test_addPartOfDirective() {
+    String partCode = r'''
+// Comment first.
+// Comment second.
+
+class A {}
+''';
+    addSource('/part.dart', partCode);
+    resolveTestUnit('''
+library my.lib;
+part 'part.dart';
+''');
+    _performAnalysis();
+    AnalysisError error = _findErrorToFix();
+    fix = _assertHasFix(DartFixKind.ADD_PART_OF, error);
+    change = fix.change;
+    // apply to "file"
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/part.dart');
+    expect(SourceEdit.applySequence(partCode, fileEdit.edits), r'''
+// Comment first.
+// Comment second.
+
+part of my.lib;
+
+class A {}
+''');
+  }
+
   void test_addSync_BAD_nullFunctionBody() {
     resolveTestUnit('''
 var F = await;
@@ -359,6 +492,61 @@ class Test {
     _assertLinkedGroup(change.linkedEditGroups[0], ['Test v =', 'Test {']);
   }
 
+  void test_createClass_inLibraryOfPrefix() {
+    String libCode = r'''
+library my.lib;
+
+class A {}
+''';
+    addSource('/lib.dart', libCode);
+    resolveTestUnit('''
+import 'lib.dart' as lib;
+
+main() {
+  lib.A a = null;
+  lib.Test t = null;
+}
+''');
+    AnalysisError error = _findErrorToFix();
+    fix = _assertHasFix(DartFixKind.CREATE_CLASS, error);
+    change = fix.change;
+    // apply to "lib.dart"
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/lib.dart');
+    expect(SourceEdit.applySequence(libCode, fileEdit.edits), r'''
+library my.lib;
+
+class A {}
+
+class Test {
+}
+''');
+    expect(change.linkedEditGroups, isEmpty);
+  }
+
+  void test_createClass_innerLocalFunction() {
+    resolveTestUnit('''
+f() {
+  g() {
+    Test v = null;
+  }
+}
+''');
+    assertHasFix(DartFixKind.CREATE_CLASS, '''
+f() {
+  g() {
+    Test v = null;
+  }
+}
+
+class Test {
+}
+''');
+    _assertLinkedGroup(change.linkedEditGroups[0], ['Test v =', 'Test {']);
+  }
+
   void test_createConstructor_forFinalFields() {
     errorFilter = (AnalysisError error) {
       return error.message.contains("'a'");
@@ -517,6 +705,25 @@ class B extends A {
     assertNoFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION);
   }
 
+  void test_createConstructorSuperExplicit_typeArgument() {
+    resolveTestUnit('''
+class A<T> {
+  A(T p);
+}
+class B extends A<int> {
+  B();
+}
+''');
+    assertHasFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION, '''
+class A<T> {
+  A(T p);
+}
+class B extends A<int> {
+  B() : super(0);
+}
+''');
+  }
+
   void test_createConstructorSuperImplicit() {
     resolveTestUnit('''
 class A {
@@ -629,6 +836,24 @@ class B extends A {
 }
 ''');
     assertNoFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER);
+  }
+
+  void test_createConstructorSuperImplicit_typeArgument() {
+    resolveTestUnit('''
+class C<T> {
+  final T x;
+  C(this.x);
+}
+class D extends C<int> {
+}''');
+    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER, '''
+class C<T> {
+  final T x;
+  C(this.x);
+}
+class D extends C<int> {
+  D(int x) : super(x);
+}''');
   }
 
   void test_createField_BAD_inEnum() {
@@ -1018,6 +1243,7 @@ import 'my_file.dart';
     SourceFileEdit fileEdit = change.edits[0];
     expect(fileEdit.file, '/my/project/bin/my_file.dart');
     expect(fileEdit.fileStamp, -1);
+    expect(fileEdit.edits, hasLength(1));
     expect(fileEdit.edits[0].replacement, contains('library my.file;'));
   }
 
@@ -1036,6 +1262,36 @@ part 'my_part.dart';
     SourceFileEdit fileEdit = change.edits[0];
     expect(fileEdit.file, '/my/project/bin/my_part.dart');
     expect(fileEdit.fileStamp, -1);
+    expect(fileEdit.edits, hasLength(1));
+    expect(fileEdit.edits[0].replacement, contains('part of my.lib;'));
+  }
+
+  void test_createFile_forPart_inPackageLib() {
+    provider.newFile('/my/pubspec.yaml', r'''
+name: my_test
+''');
+    testFile = '/my/lib/test.dart';
+    addTestSource('''
+library my.lib;
+part 'my_part.dart';
+''', Uri.parse('package:my/test.dart'));
+    // configure SourceFactory
+    UriResolver pkgResolver = new PackageMapUriResolver(
+        provider, {'my': [provider.getResource('/my/lib')],});
+    context.sourceFactory = new SourceFactory(
+        [AbstractContextTest.SDK_RESOLVER, pkgResolver, resourceResolver]);
+    // prepare fix
+    testUnit = resolveLibraryUnit(testSource);
+    AnalysisError error = _findErrorToFix();
+    fix = _assertHasFix(DartFixKind.CREATE_FILE, error);
+    change = fix.change;
+    // validate change
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/my/lib/my_part.dart');
+    expect(fileEdit.fileStamp, -1);
+    expect(fileEdit.edits, hasLength(1));
     expect(fileEdit.edits[0].replacement, contains('part of my.lib;'));
   }
 
@@ -1391,7 +1647,7 @@ class B extends A {
 ''');
   }
 
-  void test_createMissingOverrides_generics() {
+  void test_createMissingOverrides_generics_typeArguments() {
     resolveTestUnit('''
 class Iterator<T> {
 }
@@ -1415,6 +1671,29 @@ class Test extends IterableMixin<int> {
   // TODO: implement iterator
   @override
   Iterator<int> get iterator => null;
+}
+''');
+  }
+
+  void test_createMissingOverrides_generics_typeParameters() {
+    resolveTestUnit('''
+abstract class ItemProvider<T> {
+  List<T> getItems();
+}
+
+class Test<V> extends ItemProvider<V> {
+}
+''');
+    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+abstract class ItemProvider<T> {
+  List<T> getItems();
+}
+
+class Test<V> extends ItemProvider<V> {
+  @override
+  List<V> getItems() {
+    // TODO: implement getItems
+  }
 }
 ''');
   }
@@ -3114,7 +3393,7 @@ main() {
     assertNoFix(DartFixKind.CREATE_METHOD);
   }
 
-  void test_undefinedMethod_create_generic_BAD() {
+  void test_undefinedMethod_create_generic_BAD_argumentType() {
     resolveTestUnit('''
 class A<T> {
   B b;
@@ -3138,6 +3417,31 @@ class A<T> {
 
 class B {
   void process(Map items) {
+  }
+}
+''');
+  }
+
+  void test_undefinedMethod_create_generic_BAD_returnType() {
+    resolveTestUnit('''
+class A<T> {
+  main() {
+    T t = new B().compute();
+  }
+}
+
+class B {
+}
+''');
+    assertHasFix(DartFixKind.CREATE_METHOD, '''
+class A<T> {
+  main() {
+    T t = new B().compute();
+  }
+}
+
+class B {
+  dynamic compute() {
   }
 }
 ''');
@@ -3611,5 +3915,9 @@ main() {
       positions.add(new Position(testFile, offset));
     }
     return positions;
+  }
+
+  void _performAnalysis() {
+    while (context.performAnalysisTask().hasMoreWork);
   }
 }

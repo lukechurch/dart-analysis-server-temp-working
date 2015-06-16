@@ -25,6 +25,8 @@ abstract class LocalDeclarationVisitor extends GeneralizingAstVisitor {
 
   void declaredClassTypeAlias(ClassTypeAlias declaration);
 
+  void declaredEnum(EnumDeclaration declaration) {}
+
   void declaredField(FieldDeclaration fieldDecl, VariableDeclaration varDecl);
 
   void declaredFunction(FunctionDeclaration declaration);
@@ -123,8 +125,7 @@ abstract class LocalDeclarationVisitor extends GeneralizingAstVisitor {
       if (declaration is ClassDeclaration) {
         declaredClass(declaration);
       } else if (declaration is EnumDeclaration) {
-        // TODO (danrubel) enum support
-//        declaredEnum(........)
+        declaredEnum(declaration);
       } else if (declaration is FunctionDeclaration) {
         declaredFunction(declaration);
       } else if (declaration is TopLevelVariableDeclaration) {
@@ -160,7 +161,10 @@ abstract class LocalDeclarationVisitor extends GeneralizingAstVisitor {
       id = node.identifier;
       type = null;
     }
-    declaredLocalVar(id, type);
+    if (id != null) {
+      // If there is no loop variable, don't declare it.
+      declaredLocalVar(id, type);
+    }
     visitNode(node);
   }
 

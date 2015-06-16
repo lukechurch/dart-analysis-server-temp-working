@@ -60,6 +60,19 @@ void f(Derived d) {
     });
   }
 
+  fail_enumConst_deprecated() {
+    addTestSource('@deprecated enum E { one, two } main() {E.^}');
+    return computeFull((bool result) {
+      assertNotSuggested('E');
+      // TODO(danrubel) Investigate why enum suggestion is not marked
+      // as deprecated if enum ast element is deprecated
+      assertSuggestEnumConst('one', isDeprecated: true);
+      assertSuggestEnumConst('two', isDeprecated: true);
+      assertNotSuggested('index');
+      assertSuggestField('values', 'List<E>', isDeprecated: true);
+    });
+  }
+
   fail_test_PrefixedIdentifier_trailingStmt_const_untyped() {
     // SimpleIdentifier  PrefixedIdentifier  ExpressionStatement
     addTestSource('const g = "hello"; f() {g.^ int y = 0;}');
@@ -72,6 +85,72 @@ void f(Derived d) {
   @override
   void setUpContributor() {
     contributor = new PrefixedElementContributor();
+  }
+
+  test_enumConst() {
+    addTestSource('enum E { one, two } main() {E.^}');
+    return computeFull((bool result) {
+      assertNotSuggested('E');
+      assertSuggestEnumConst('one');
+      assertSuggestEnumConst('two');
+      assertNotSuggested('index');
+      assertSuggestField('values', 'List<E>');
+    });
+  }
+
+  test_enumConst2() {
+    addTestSource('enum E { one, two } main() {E.o^}');
+    return computeFull((bool result) {
+      assertNotSuggested('E');
+      assertSuggestEnumConst('one');
+      assertSuggestEnumConst('two');
+      assertNotSuggested('index');
+      assertSuggestField('values', 'List<E>');
+    });
+  }
+
+  test_enumConst3() {
+    addTestSource('enum E { one, two } main() {E.^ int g;}');
+    return computeFull((bool result) {
+      assertNotSuggested('E');
+      assertSuggestEnumConst('one');
+      assertSuggestEnumConst('two');
+      assertNotSuggested('index');
+      assertSuggestField('values', 'List<E>');
+    });
+  }
+
+  test_enumConst_index() {
+    addTestSource('enum E { one, two } main() {E.one.^}');
+    return computeFull((bool result) {
+      assertNotSuggested('E');
+      assertNotSuggested('one');
+      assertNotSuggested('two');
+      assertSuggestField('index', 'int');
+      assertNotSuggested('values');
+    });
+  }
+
+  test_enumConst_index2() {
+    addTestSource('enum E { one, two } main() {E.one.i^}');
+    return computeFull((bool result) {
+      assertNotSuggested('E');
+      assertNotSuggested('one');
+      assertNotSuggested('two');
+      assertSuggestField('index', 'int');
+      assertNotSuggested('values');
+    });
+  }
+
+  test_enumConst_index3() {
+    addTestSource('enum E { one, two } main() {E.one.^ int g;}');
+    return computeFull((bool result) {
+      assertNotSuggested('E');
+      assertNotSuggested('one');
+      assertNotSuggested('two');
+      assertSuggestField('index', 'int');
+      assertNotSuggested('values');
+    });
   }
 
   test_generic_field() {
@@ -521,6 +600,48 @@ void test(Derived d) {
 ''');
     return computeFull((bool result) {
       assertSuggestMethod('f', 'Base', 'void');
+    });
+  }
+
+  test_super() {
+    // SimpleIdentifier  MethodInvocation  ExpressionStatement
+    addTestSource('''
+class C3 {
+  int fi3;
+  static int fs3;
+  m() {}
+  mi3() {}
+  static ms3() {}
+}
+class C2 {
+  int fi2;
+  static int fs2;
+  m() {}
+  mi2() {}
+  static ms2() {}
+}
+class C1 extends C2 implements C3 {
+  int fi1;
+  static int fs1;
+  m() {super.^}
+  mi1() {}
+  static ms1() {}
+}''');
+    return computeFull((bool result) {
+      assertNotSuggested('fi1');
+      assertNotSuggested('fs1');
+      assertNotSuggested('mi1');
+      assertNotSuggested('ms1');
+      assertSuggestInvocationField('fi2', 'int');
+      assertNotSuggested('fs2');
+      assertSuggestInvocationMethod('mi2', 'C2', null);
+      assertNotSuggested('ms2');
+      assertSuggestInvocationMethod('m', 'C2', null,
+          relevance: DART_RELEVANCE_HIGH);
+      assertNotSuggested('fi3');
+      assertNotSuggested('fs3');
+      assertNotSuggested('mi3');
+      assertNotSuggested('ms3');
     });
   }
 }

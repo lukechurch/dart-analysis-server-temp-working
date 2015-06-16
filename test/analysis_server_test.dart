@@ -10,6 +10,7 @@ import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/constants.dart';
 import 'package:analysis_server/src/domain_server.dart';
 import 'package:analysis_server/src/operation/operation.dart';
+import 'package:analysis_server/src/plugin/server_plugin.dart';
 import 'package:analysis_server/src/protocol.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
@@ -18,6 +19,7 @@ import 'package:analyzer/source/package_map_resolver.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/java_engine.dart';
 import 'package:analyzer/src/generated/source.dart';
+import 'package:plugin/manager.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 import 'package:typed_mock/typed_mock.dart';
 import 'package:unittest/unittest.dart';
@@ -115,8 +117,11 @@ import "../foo/foo.dart";
     channel = new MockServerChannel();
     resourceProvider = new MemoryResourceProvider();
     packageMapProvider = new MockPackageMapProvider();
+    ExtensionManager manager = new ExtensionManager();
+    ServerPlugin serverPlugin = new ServerPlugin();
+    manager.processPlugins([serverPlugin]);
     server = new AnalysisServer(channel, resourceProvider, packageMapProvider,
-        null, new AnalysisServerOptions(), new MockSdk(),
+        null, serverPlugin, new AnalysisServerOptions(), new MockSdk(),
         InstrumentationService.NULL_SERVICE, rethrowExceptions: true);
   }
 
@@ -203,7 +208,7 @@ import "../foo/foo.dart";
     File bar = resourceProvider.newFile('/bar/bar.dart', 'library lib;');
     Source barSource = bar.createSource();
     server.setAnalysisRoots('0', ['/foo', '/bar'], [], {});
-    return pumpEventQueue(50).then((_) {
+    return pumpEventQueue(200).then((_) {
       expect(server.statusAnalyzing, isFalse);
       // Make sure getAnalysisContext returns the proper context for each.
       AnalysisContext fooContext =
@@ -241,6 +246,20 @@ import "../foo/foo.dart";
     expect(source, isNotNull);
     expect(source.uri.scheme, 'file');
     expect(source.fullName, filePath);
+  }
+
+  test_getContextSourcePair_nonFile() {
+    String dirPath = '/dir';
+    Folder dir = resourceProvider.newFolder(dirPath);
+
+    AnalysisContext context = AnalysisEngine.instance.createAnalysisContext();
+    _configureSourceFactory(context);
+    server.folderMap[dir] = context;
+
+    ContextSourcePair pair = server.getContextSourcePair(dirPath);
+    expect(pair, isNotNull);
+    expect(pair.context, isNull);
+    expect(pair.source, isNull);
   }
 
   test_getContextSourcePair_package_inRoot() {
@@ -301,12 +320,12 @@ import "../foo/foo.dart";
       subscriptions[service] = <String>[bar.path].toSet();
     }
     server.setAnalysisSubscriptions(subscriptions);
-    await pumpEventQueue(100);
+    await pumpEventQueue(500);
     expect(server.statusAnalyzing, isFalse);
     channel.notificationsReceived.clear();
     server.updateContent(
         '0', {bar.path: new AddContentOverlay('library bar; void f() {}')});
-    await pumpEventQueue(100);
+    await pumpEventQueue(500);
     expect(server.statusAnalyzing, isFalse);
     expect(channel.notificationsReceived, isNotEmpty);
     Set<String> notificationTypesReceived = new Set<String>();
