@@ -6,9 +6,14 @@ homepage: http://www.dartlang.org
 environment:
   sdk: '>=1.9.0 <2.0.0'
 dependencies:
-  analyzer: '>=0.25.1-alpha.1 <0.26.0'
+  analyzer:
+    git: 
+      url: git://github.com/lukechurch/dart-analyzer-temp-working.git
+  args: '>=0.12.1 <0.13.0'
+  dart_style:
+    git: 
+      url: git://github.com/lukechurch/dart_style.git
   args: '>=0.13.0 <0.14.0'
-  dart_style: '>=0.1.7 <0.2.0'
   logging: any
   path: any
   plugin: <0.2.0
