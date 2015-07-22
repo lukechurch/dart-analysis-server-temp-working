@@ -281,7 +281,7 @@ abstract class JsonDecoder {
    * Create an exception to throw if the JSON object at [jsonPath] fails to
    * match the API definition of [expected].
    */
-  dynamic mismatch(String jsonPath, String expected);
+  dynamic mismatch(String jsonPath, String expected, [Object actual]);
 
   /**
    * Create an exception to throw if the JSON object at [jsonPath] is missing
@@ -301,7 +301,7 @@ abstract class JsonDecoder {
     } else if (json == 'false') {
       return false;
     }
-    throw mismatch(jsonPath, 'bool');
+    throw mismatch(jsonPath, 'bool', json);
   }
 
   /**
@@ -313,10 +313,10 @@ abstract class JsonDecoder {
       return json;
     } else if (json is String) {
       return int.parse(json, onError: (String value) {
-        throw mismatch(jsonPath, 'int');
+        throw mismatch(jsonPath, 'int', json);
       });
     }
-    throw mismatch(jsonPath, 'int');
+    throw mismatch(jsonPath, 'int', json);
   }
 
   /**
@@ -334,7 +334,7 @@ abstract class JsonDecoder {
       }
       return result;
     } else {
-      throw mismatch(jsonPath, 'List');
+      throw mismatch(jsonPath, 'List', json);
     }
   }
 
@@ -362,7 +362,7 @@ abstract class JsonDecoder {
       });
       return result;
     } else {
-      throw mismatch(jsonPath, 'Map');
+      throw mismatch(jsonPath, 'Map', json);
     }
   }
 
@@ -373,7 +373,7 @@ abstract class JsonDecoder {
     if (json is String) {
       return json;
     } else {
-      throw mismatch(jsonPath, 'String');
+      throw mismatch(jsonPath, 'String', json);
     }
   }
 
@@ -392,11 +392,11 @@ abstract class JsonDecoder {
       var disambiguatorPath = '$jsonPath[${JSON.encode(field)}]';
       String disambiguator = _decodeString(disambiguatorPath, json[field]);
       if (!decoders.containsKey(disambiguator)) {
-        throw mismatch(disambiguatorPath, 'One of: ${decoders.keys.toList()}');
+        throw mismatch(disambiguatorPath, 'One of: ${decoders.keys.toList()}', json);
       }
       return decoders[disambiguator](jsonPath, json);
     } else {
-      throw mismatch(jsonPath, 'Map');
+      throw mismatch(jsonPath, 'Map', json);
     }
   }
 }
@@ -513,37 +513,6 @@ class Request {
       : _params = params != null ? params : new HashMap<String, Object>();
 
   /**
-   * Return a request parsed from the given [data], or `null` if the [data] is
-   * not a valid json representation of a request. The [data] is expected to
-   * have the following format:
-   *
-   *   {
-   *     'clientRequestTime': millisecondsSinceEpoch
-   *     'id': String,
-   *     'method': methodName,
-   *     'params': {
-   *       paramter_name: value
-   *     }
-   *   }
-   *
-   * where both the parameters and clientRequestTime are optional.
-   * The parameters can contain any number of name/value pairs.
-   * The clientRequestTime must be an int representing the time at which
-   * the client issued the request (milliseconds since epoch).
-   */
-  factory Request.fromString(String data) {
-    try {
-      var result = JSON.decode(data);
-      if (result is Map) {
-        return new Request.fromJson(result);
-      }
-      return null;
-    } catch (exception) {
-      return null;
-    }
-  }
-
-  /**
    * Return a request parsed from the given json, or `null` if the [data] is
    * not a valid json representation of a request. The [data] is expected to
    * have the following format:
@@ -576,6 +545,37 @@ class Request {
     if (params is Map || params == null) {
       return new Request(id, method, params, time);
     } else {
+      return null;
+    }
+  }
+
+  /**
+   * Return a request parsed from the given [data], or `null` if the [data] is
+   * not a valid json representation of a request. The [data] is expected to
+   * have the following format:
+   *
+   *   {
+   *     'clientRequestTime': millisecondsSinceEpoch
+   *     'id': String,
+   *     'method': methodName,
+   *     'params': {
+   *       paramter_name: value
+   *     }
+   *   }
+   *
+   * where both the parameters and clientRequestTime are optional.
+   * The parameters can contain any number of name/value pairs.
+   * The clientRequestTime must be an int representing the time at which
+   * the client issued the request (milliseconds since epoch).
+   */
+  factory Request.fromString(String data) {
+    try {
+      var result = JSON.decode(data);
+      if (result is Map) {
+        return new Request.fromJson(result);
+      }
+      return null;
+    } catch (exception) {
       return null;
     }
   }
@@ -616,9 +616,17 @@ class RequestDecoder extends JsonDecoder {
   }
 
   @override
-  dynamic mismatch(String jsonPath, String expected) {
+  dynamic mismatch(String jsonPath, String expected, [Object actual]) {
+    StringBuffer buffer = new StringBuffer();
+    buffer.write('Expected to be ');
+    buffer.write(expected);
+    if (actual != null) {
+      buffer.write('; found "');
+      buffer.write(JSON.encode(actual));
+      buffer.write('"');
+    }
     return new RequestFailure(new Response.invalidParameter(
-        _request, jsonPath, 'Expected to be $expected'));
+        _request, jsonPath, buffer.toString()));
   }
 
   @override
@@ -761,6 +769,14 @@ class Response {
   Response.getErrorsInvalidFile(Request request) : this(request.id,
           error: new RequestError(RequestErrorCode.GET_ERRORS_INVALID_FILE,
               'Error during `analysis.getErrors`: invalid file.'));
+
+  /**
+   * Initialize a newly created instance to represent the
+   * GET_NAVIGATION_INVALID_FILE error condition.
+   */
+  Response.getNavigationInvalidFile(Request request) : this(request.id,
+          error: new RequestError(RequestErrorCode.GET_NAVIGATION_INVALID_FILE,
+              'Error during `analysis.getNavigation`: invalid file.'));
 
   /**
    * Initialize a newly created instance to represent an error condition caused
@@ -907,8 +923,18 @@ class ResponseDecoder extends JsonDecoder {
   ResponseDecoder(this.refactoringKind);
 
   @override
-  dynamic mismatch(String jsonPath, String expected) {
-    return new Exception('Expected $expected at $jsonPath');
+  dynamic mismatch(String jsonPath, String expected, [Object actual]) {
+    StringBuffer buffer = new StringBuffer();
+    buffer.write('Expected ');
+    buffer.write(expected);
+    if (actual != null) {
+      buffer.write(' found "');
+      buffer.write(JSON.encode(actual));
+      buffer.write('"');
+    }
+    buffer.write(' at ');
+    buffer.write(jsonPath);
+    return new Exception(buffer.toString());
   }
 
   @override
