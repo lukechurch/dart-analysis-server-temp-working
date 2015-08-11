@@ -21,9 +21,9 @@ import 'package:analysis_server/src/services/completion/dart_completion_manager.
 import 'package:analysis_server/src/services/index/index.dart' show Index;
 import 'package:analysis_server/src/services/index/local_memory_index.dart';
 import 'package:analysis_server/src/services/search/search_engine.dart';
-import 'package:analysis_server/src/source/optimizing_pub_package_map_provider.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
+import 'package:analyzer/source/pub_package_map_provider.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/sdk.dart';
 import 'package:analyzer/src/generated/source.dart';
@@ -34,9 +34,10 @@ import 'package:unittest/unittest.dart';
 import 'analysis_abstract.dart';
 import 'mock_sdk.dart';
 import 'mocks.dart';
+import 'utils.dart';
 
 main() {
-  groupSep = ' | ';
+  initializeTestEnvironment();
   defineReflectiveTests(CompletionManagerTest);
   defineReflectiveTests(CompletionTest);
   defineReflectiveTests(_NoSearchEngine);
@@ -54,9 +55,14 @@ class CompletionManagerTest extends AbstractAnalysisTest {
     ExtensionManager manager = new ExtensionManager();
     ServerPlugin serverPlugin = new ServerPlugin();
     manager.processPlugins([serverPlugin]);
-    return new Test_AnalysisServer(super.serverChannel, super.resourceProvider,
-        super.packageMapProvider, index, serverPlugin,
-        new AnalysisServerOptions(), new MockSdk(),
+    return new Test_AnalysisServer(
+        super.serverChannel,
+        super.resourceProvider,
+        super.packageMapProvider,
+        index,
+        serverPlugin,
+        new AnalysisServerOptions(),
+        new MockSdk(),
         InstrumentationService.NULL_SERVICE);
   }
 
@@ -277,7 +283,8 @@ class CompletionTest extends AbstractAnalysisTest {
   }
 
   void assertHasResult(CompletionSuggestionKind kind, String completion,
-      [int relevance = DART_RELEVANCE_DEFAULT, bool isDeprecated = false,
+      [int relevance = DART_RELEVANCE_DEFAULT,
+      bool isDeprecated = false,
       bool isPotential = false]) {
     var cs;
     suggestions.forEach((s) {
@@ -475,7 +482,9 @@ class B extends A {m() {^}}
   }
 
   test_partFile() {
-    addFile('/project/bin/testA.dart', '''
+    addFile(
+        '/project/bin/testA.dart',
+        '''
       library libA;
       part "$testFile";
       import 'dart:html';
@@ -495,7 +504,9 @@ class B extends A {m() {^}}
   }
 
   test_partFile2() {
-    addFile('/testA.dart', '''
+    addFile(
+        '/testA.dart',
+        '''
       part of libA;
       class A { }''');
     addTestFile('''
@@ -655,14 +666,24 @@ class MockSubscription<E> implements StreamSubscription<E> {
 class Test_AnalysisServer extends AnalysisServer {
   final MockContext mockContext = new MockContext();
 
-  Test_AnalysisServer(ServerCommunicationChannel channel,
+  Test_AnalysisServer(
+      ServerCommunicationChannel channel,
       ResourceProvider resourceProvider,
-      OptimizingPubPackageMapProvider packageMapProvider, Index index,
-      ServerPlugin serverPlugin, AnalysisServerOptions analysisServerOptions,
-      DartSdk defaultSdk, InstrumentationService instrumentationService)
-      : super(channel, resourceProvider, packageMapProvider, index,
-          serverPlugin, analysisServerOptions, defaultSdk,
-          instrumentationService);
+      PubPackageMapProvider packageMapProvider,
+      Index index,
+      ServerPlugin serverPlugin,
+      AnalysisServerOptions analysisServerOptions,
+      DartSdk defaultSdk,
+      InstrumentationService instrumentationService)
+      : super(
+            channel,
+            resourceProvider,
+            packageMapProvider,
+            index,
+            serverPlugin,
+            analysisServerOptions,
+            defaultSdk,
+            instrumentationService);
 
   @override
   AnalysisContext getAnalysisContext(String path) {
