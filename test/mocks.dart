@@ -4,21 +4,22 @@
 
 library mocks;
 
-@MirrorsUsed(targets: 'mocks', override: '*')
-import 'dart:mirrors';
 import 'dart:async';
 import 'dart:io';
+@MirrorsUsed(targets: 'mocks', override: '*')
+import 'dart:mirrors';
 
+import 'package:analysis_server/plugin/protocol/protocol.dart'
+    hide Element, ElementKind;
 import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/channel/channel.dart';
 import 'package:analysis_server/src/operation/operation.dart';
 import 'package:analysis_server/src/operation/operation_analysis.dart';
-import 'package:analysis_server/src/protocol.dart' hide Element, ElementKind;
-import 'package:analysis_server/src/source/optimizing_pub_package_map_provider.dart';
+import 'package:analyzer/dart/element/element.dart';
 import 'package:analyzer/file_system/file_system.dart' as resource;
 import 'package:analyzer/file_system/memory_file_system.dart' as resource;
 import 'package:analyzer/source/package_map_provider.dart';
-import 'package:analyzer/src/generated/element.dart';
+import 'package:analyzer/source/pub_package_map_provider.dart';
 import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:typed_mock/typed_mock.dart';
@@ -58,7 +59,7 @@ Matcher isResponseSuccess(String id) => new _IsResponseSuccess(id);
  * times. By default, this should pump the event queue enough times to allow
  * any code to run, as long as it's not waiting on some external event.
  */
-Future pumpEventQueue([int times = 500]) {
+Future pumpEventQueue([int times = 5000]) {
   if (times == 0) return new Future.value();
   // We use a delayed future to allow microtask events to finish. The
   // Future.value or Future() constructors use scheduleMicrotask themselves and
@@ -71,23 +72,19 @@ typedef void MockServerOperationPerformFunction(AnalysisServer server);
 
 class MockAnalysisContext extends StringTypedMock implements AnalysisContext {
   MockAnalysisContext(String name) : super(name);
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockClassElement extends TypedMock implements ClassElement {
   final ElementKind kind = ElementKind.CLASS;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockCompilationUnitElement extends TypedMock
     implements CompilationUnitElement {
   final ElementKind kind = ElementKind.COMPILATION_UNIT;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockConstructorElement extends TypedMock implements ConstructorElement {
   final kind = ElementKind.CONSTRUCTOR;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockElement extends StringTypedMock implements Element {
@@ -98,61 +95,45 @@ class MockElement extends StringTypedMock implements Element {
 
   @override
   String get name => _toString;
-
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockFieldElement extends TypedMock implements FieldElement {
   final ElementKind kind = ElementKind.FIELD;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockFunctionElement extends TypedMock implements FunctionElement {
   final ElementKind kind = ElementKind.FUNCTION;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockFunctionTypeAliasElement extends TypedMock
     implements FunctionTypeAliasElement {
   final ElementKind kind = ElementKind.FUNCTION_TYPE_ALIAS;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class MockHtmlElement extends TypedMock implements HtmlElement {
-  final ElementKind kind = ElementKind.HTML;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockImportElement extends TypedMock implements ImportElement {
   final ElementKind kind = ElementKind.IMPORT;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockLibraryElement extends TypedMock implements LibraryElement {
   final ElementKind kind = ElementKind.LIBRARY;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockLocalVariableElement extends TypedMock
     implements LocalVariableElement {
   final ElementKind kind = ElementKind.LOCAL_VARIABLE;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class MockLogger extends TypedMock implements Logger {
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
+class MockLogger extends TypedMock implements Logger {}
 
 class MockMethodElement extends StringTypedMock implements MethodElement {
   final kind = ElementKind.METHOD;
   MockMethodElement([String name = 'method']) : super(name);
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /**
  * A mock [PackageMapProvider].
  */
-class MockPackageMapProvider implements OptimizingPubPackageMapProvider {
+class MockPackageMapProvider implements PubPackageMapProvider {
   /**
    * Package map that will be returned by the next call to [computePackageMap].
    */
@@ -170,36 +151,17 @@ class MockPackageMapProvider implements OptimizingPubPackageMapProvider {
   Set<String> dependencies = new Set<String>();
 
   /**
-   * Modification times that will be returned by the next call to
-   * [computePackageMap].  This will be filtered to include only those paths
-   * mentioned in the `dependencies` field of [computePackageMap]'s
-   * `previousInfo` argument.
-   */
-  Map<String, int> modificationTimes = <String, int>{};
-
-  /**
    * Number of times [computePackageMap] has been called.
    */
   int computeCount = 0;
 
   @override
-  OptimizingPubPackageMapInfo computePackageMap(resource.Folder folder,
-      [OptimizingPubPackageMapInfo previousInfo]) {
+  PackageMapInfo computePackageMap(resource.Folder folder) {
     ++computeCount;
-    Map<String, int> filteredModificationTimes = <String, int>{};
-    if (previousInfo != null) {
-      for (String dependency in previousInfo.dependencies) {
-        if (modificationTimes.containsKey(dependency)) {
-          filteredModificationTimes[dependency] = modificationTimes[dependency];
-        }
-      }
-    }
     if (packageMaps != null) {
-      return new OptimizingPubPackageMapInfo(
-          packageMaps[folder.path], dependencies, filteredModificationTimes);
+      return new PackageMapInfo(packageMaps[folder.path], dependencies);
     }
-    return new OptimizingPubPackageMapInfo(
-        packageMap, dependencies, filteredModificationTimes);
+    return new PackageMapInfo(packageMap, dependencies);
   }
 
   noSuchMethod(Invocation invocation) {
@@ -210,14 +172,12 @@ class MockPackageMapProvider implements OptimizingPubPackageMapProvider {
 
 class MockParameterElement extends TypedMock implements ParameterElement {
   final ElementKind kind = ElementKind.PARAMETER;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockPropertyAccessorElement extends TypedMock
     implements PropertyAccessorElement {
   final ElementKind kind;
   MockPropertyAccessorElement(this.kind);
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /**
@@ -248,8 +208,8 @@ class MockServerChannel implements ServerCommunicationChannel {
   @override
   void listen(void onRequest(Request request),
       {Function onError, void onDone()}) {
-    requestController.stream.listen(onRequest,
-        onError: onError, onDone: onDone);
+    requestController.stream
+        .listen(onRequest, onError: onError, onDone: onDone);
   }
 
   @override
@@ -273,7 +233,7 @@ class MockServerChannel implements ServerCommunicationChannel {
     if (_closed) {
       throw new Exception('sendRequest after connection closed');
     }
-    // Wrap send request in future to simulate websocket
+    // Wrap send request in future to simulate WebSocket.
     new Future(() => requestController.add(request));
     return waitForResponse(request);
   }
@@ -285,7 +245,7 @@ class MockServerChannel implements ServerCommunicationChannel {
       return;
     }
     responsesReceived.add(response);
-    // Wrap send response in future to simulate websocket
+    // Wrap send response in future to simulate WebSocket.
     new Future(() => responseController.add(response));
   }
 
@@ -349,8 +309,8 @@ class MockSocket<T> implements WebSocket {
       controller.close().then((_) => twin.controller.close());
 
   StreamSubscription<T> listen(void onData(T event),
-      {Function onError, void onDone(), bool cancelOnError}) => stream.listen(
-          onData,
+          {Function onError, void onDone(), bool cancelOnError}) =>
+      stream.listen(onData,
           onError: onError, onDone: onDone, cancelOnError: cancelOnError);
 
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -360,19 +320,16 @@ class MockSocket<T> implements WebSocket {
 
 class MockSource extends StringTypedMock implements Source {
   MockSource([String name = 'mocked.dart']) : super(name);
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockTopLevelVariableElement extends TypedMock
     implements TopLevelVariableElement {
   final ElementKind kind = ElementKind.TOP_LEVEL_VARIABLE;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class MockTypeParameterElement extends TypedMock
     implements TypeParameterElement {
   final ElementKind kind = ElementKind.TYPE_PARAMETER;
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 class NoResponseException implements Exception {

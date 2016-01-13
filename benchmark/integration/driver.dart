@@ -7,7 +7,6 @@ library server.driver;
 import 'dart:async';
 import 'dart:math' show max, sqrt;
 
-import 'package:analyzer/src/generated/engine.dart' as engine;
 import 'package:logging/logging.dart';
 
 import '../../test/integration/integration_test_methods.dart';
@@ -44,7 +43,12 @@ class Driver extends IntegrationTestMixin {
    */
   static const Duration SHUTDOWN_TIMEOUT = const Duration(seconds: 5);
 
-  final Logger logger;
+  final Logger logger = new Logger('Driver');
+
+  /**
+   * The diagnostic port for Analysis Server or `null` if none.
+   */
+  final int diagnosticPort;
 
   /**
    * A flag indicating whether the server is running.
@@ -64,7 +68,7 @@ class Driver extends IntegrationTestMixin {
    */
   Completer<Results> _runCompleter = new Completer<Results>();
 
-  Driver(this.logger);
+  Driver({this.diagnosticPort});
 
   /**
    * Return a [Future] that completes with the [Results] of running
@@ -97,7 +101,7 @@ class Driver extends IntegrationTestMixin {
    * Launch the analysis server.
    * Return a [Future] that completes when analysis server has started.
    */
-  Future startServer({int diagnosticPort}) async {
+  Future startServer() async {
     logger.log(Level.FINE, 'starting server');
     initializeInttestMixin();
     server = new Server();
@@ -193,7 +197,7 @@ class Measurement {
     _printDuration(sb, new Duration(microseconds: meanTime));
     _printDuration(sb, time90th);
     _printDuration(sb, time99th);
-    _printColumn(sb, standardDeviation.toString(), 15, rightJustified: true);
+    _printDuration(sb, new Duration(microseconds: standardDeviation));
     _printDuration(sb, minTime);
     _printDuration(sb, maxTime);
     _printDuration(sb, new Duration(microseconds: totalTimeMicros));
@@ -212,9 +216,8 @@ class Measurement {
   }
 
   void _printDuration(StringBuffer sb, Duration duration) {
-    sb.write('  ');
-    sb.write(duration);
-    sb.write(',');
+    _printColumn(sb, duration.inMilliseconds.toString(), 15,
+        rightJustified: true);
   }
 }
 
@@ -231,11 +234,6 @@ class Results {
   void printResults() {
     print('');
     print('==================================================================');
-    if (engine.AnalysisEngine.instance.useTaskModel) {
-      print('New task model');
-    } else {
-      print('Old task model');
-    }
     print('');
     List<String> keys = measurements.keys.toList()..sort();
     int keyLen = keys.fold(0, (int len, String key) => max(len, key.length));
@@ -262,12 +260,13 @@ class Results {
         m.printSummary(keyLen);
       }
     }
+
     /// TODO(danrubel) *** print warnings if driver caches are not empty ****
-    print('');
-    print(
-        '(1) uxr = UneXpected Results, or responses received from the server');
-    print(
-        '          that do not match the recorded response for that request.');
+    print('''
+
+(1) uxr = UneXpected Results or responses received from the server
+          that do not match the recorded response for that request.
+(2) all times in milliseconds''');
   }
 
   /**
@@ -294,7 +293,7 @@ class Results {
     _printColumn(sb, 'error', 6, rightJustified: true);
     _printColumn(sb, 'uxr(1)', 6, rightJustified: true);
     sb.write('  ');
-    _printColumn(sb, 'mean', 15);
+    _printColumn(sb, 'mean(2)', 15);
     _printColumn(sb, '90th', 15);
     _printColumn(sb, '99th', 15);
     _printColumn(sb, 'std-dev', 15);

@@ -16,8 +16,10 @@ import 'package:analyzer/src/generated/engine.dart';
 import 'package:analyzer/src/generated/sdk_io.dart';
 import 'package:unittest/unittest.dart';
 
+import '../utils.dart';
+
 main() {
-  groupSep = ' | ';
+  initializeTestEnvironment();
 
   group('CachingPubPackageMapProvider', () {
     MemoryResourceProvider resProvider;
@@ -29,7 +31,9 @@ main() {
       'input_files': ['/tmp/proj1/pubspec.yaml']
     };
 
-    Map result1error = {'input_files': ['/tmp/proj1/pubspec.lock']};
+    Map result1error = {
+      'input_files': ['/tmp/proj1/pubspec.lock']
+    };
 
     Map result2 = {
       'packages': {'bar': '/tmp/proj2/packages/bar'},
@@ -45,7 +49,9 @@ main() {
       for (String path in inputFiles) {
         resProvider.newFile(path, '');
       }
-      return resProvider.getResource(inputFiles[0]).parent;
+      Folder projectFolder = resProvider.getResource(inputFiles[0]).parent;
+      resProvider.newFile(projectFolder.path + '/pubspec.lock', '');
+      return projectFolder;
     }
 
     int mockWriteFile(File cacheFile, String content) {
@@ -66,8 +72,10 @@ main() {
     }
 
     CachingPubPackageMapProvider newPkgProvider() {
-      return new CachingPubPackageMapProvider(resProvider,
-          DirectoryBasedDartSdk.defaultSdk, mockRunner.runPubList,
+      return new CachingPubPackageMapProvider(
+          resProvider,
+          DirectoryBasedDartSdk.defaultSdk,
+          mockRunner.runPubList,
           mockWriteFile);
     }
 
@@ -79,7 +87,6 @@ main() {
     });
 
     group('computePackageMap', () {
-
       // Assert pub list called once and results are cached in memory
       test('cache memory', () {
         expect(mockRunner.runCount, 0);

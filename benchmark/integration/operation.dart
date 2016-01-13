@@ -6,7 +6,7 @@ library server.operation;
 
 import 'dart:async';
 
-import 'package:analysis_server/src/protocol.dart';
+import 'package:analysis_server/plugin/protocol/protocol.dart';
 import 'package:logging/logging.dart';
 
 import 'driver.dart';
@@ -87,8 +87,8 @@ class RequestOperation extends Operation {
     void recordResult(bool success, result) {
       Duration elapsed = stopwatch.elapsed;
       driver.results.record(method, elapsed, success: success);
-      driver.logger.log(
-          Level.FINE, 'Response received: $method : $elapsed\n  $result');
+      driver.logger
+          .log(Level.FINE, 'Response received: $method : $elapsed\n  $result');
     }
 
     driver.send(method, json['params']).then((Map<String, dynamic> result) {
@@ -111,7 +111,7 @@ class RequestOperation extends Operation {
  * A [ResponseOperation] waits for a [JSON] response from the server.
  */
 class ResponseOperation extends Operation {
-  static final Duration responseTimeout = new Duration(seconds: 5);
+  static final Duration responseTimeout = new Duration(seconds: 60);
   final CommonInputConverter converter;
   final Map<String, dynamic> requestJson;
   final Map<String, dynamic> responseJson;
@@ -169,6 +169,7 @@ class ResponseOperation extends Operation {
           'expected error:${format(expectedError)}\n'
           'but received:${format(actualResult)}';
       driver.results.recordUnexpectedResults(requestJson['method']);
+      converter.logOverlayContent();
       if (expectedError == null) {
         converter.logger.log(Level.SEVERE, message);
       } else {
@@ -179,13 +180,9 @@ class ResponseOperation extends Operation {
 }
 
 class StartServerOperation extends Operation {
-  final int diagnosticPort;
-
-  StartServerOperation({this.diagnosticPort});
-
   @override
   Future perform(Driver driver) {
-    return driver.startServer(diagnosticPort: diagnosticPort);
+    return driver.startServer();
   }
 }
 

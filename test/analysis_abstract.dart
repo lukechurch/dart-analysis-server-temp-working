@@ -6,16 +6,21 @@ library test.domain.analysis.abstract;
 
 import 'dart:async';
 
+import 'package:analysis_server/plugin/protocol/protocol.dart';
 import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/constants.dart';
 import 'package:analysis_server/src/domain_analysis.dart';
+import 'package:analysis_server/src/plugin/linter_plugin.dart';
 import 'package:analysis_server/src/plugin/server_plugin.dart';
-import 'package:analysis_server/src/protocol.dart';
+import 'package:analysis_server/src/provisional/completion/dart/completion_plugin.dart';
 import 'package:analysis_server/src/services/index/index.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
+import 'package:analyzer/src/generated/engine.dart';
+import 'package:linter/src/plugin/linter_plugin.dart';
 import 'package:plugin/manager.dart';
+import 'package:plugin/plugin.dart';
 import 'package:unittest/unittest.dart';
 
 import 'mock_sdk.dart';
@@ -51,7 +56,7 @@ class AbstractAnalysisTest {
   final Map<AnalysisService, List<String>> analysisSubscriptions = {};
 
   String projectPath = '/project';
-  String testFolder = '/project/bin/';
+  String testFolder = '/project/bin';
   String testFile = '/project/bin/test.dart';
   String testCode;
 
@@ -83,6 +88,8 @@ class AbstractAnalysisTest {
     handleSuccessfulRequest(request);
   }
 
+  void addServerPlugins(List<Plugin> plugins) {}
+
   String addTestFile(String content) {
     addFile(testFile, content);
     this.testCode = content;
@@ -90,12 +97,36 @@ class AbstractAnalysisTest {
   }
 
   AnalysisServer createAnalysisServer(Index index) {
-    ExtensionManager manager = new ExtensionManager();
+    //
+    // Collect plugins
+    //
     ServerPlugin serverPlugin = new ServerPlugin();
-    manager.processPlugins([serverPlugin]);
-    return new AnalysisServer(serverChannel, resourceProvider,
-        packageMapProvider, index, serverPlugin, new AnalysisServerOptions(),
-        new MockSdk(), InstrumentationService.NULL_SERVICE);
+    List<Plugin> plugins = <Plugin>[];
+    plugins.addAll(AnalysisEngine.instance.requiredPlugins);
+    plugins.add(AnalysisEngine.instance.commandLinePlugin);
+    plugins.add(AnalysisEngine.instance.optionsPlugin);
+    plugins.add(serverPlugin);
+    plugins.add(dartCompletionPlugin);
+    plugins.add(linterPlugin);
+    plugins.add(linterServerPlugin);
+    addServerPlugins(plugins);
+    //
+    // Process plugins
+    //
+    ExtensionManager manager = new ExtensionManager();
+    manager.processPlugins(plugins);
+    //
+    // Create server
+    //
+    return new AnalysisServer(
+        serverChannel,
+        resourceProvider,
+        packageMapProvider,
+        index,
+        serverPlugin,
+        new AnalysisServerOptions(),
+        new MockSdk(),
+        InstrumentationService.NULL_SERVICE);
   }
 
   Index createIndex() {
@@ -169,7 +200,8 @@ class AbstractAnalysisTest {
     packageMapProvider = new MockPackageMapProvider();
     Index index = createIndex();
     server = createAnalysisServer(index);
-    handler = new AnalysisDomainHandler(server);
+    handler = server.handlers
+        .singleWhere((handler) => handler is AnalysisDomainHandler);
     // listen for notifications
     Stream<Notification> notificationStream =
         serverChannel.notificationController.stream;

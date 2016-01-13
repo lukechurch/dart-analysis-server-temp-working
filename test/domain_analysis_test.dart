@@ -6,11 +6,11 @@ library test.domain.analysis;
 
 import 'dart:async';
 
+import 'package:analysis_server/plugin/protocol/protocol.dart';
 import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/constants.dart';
 import 'package:analysis_server/src/domain_analysis.dart';
 import 'package:analysis_server/src/plugin/server_plugin.dart';
-import 'package:analysis_server/src/protocol.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
 import 'package:analyzer/instrumentation/instrumentation.dart';
 import 'package:path/path.dart';
@@ -21,9 +21,10 @@ import 'package:unittest/unittest.dart';
 import 'analysis_abstract.dart';
 import 'mock_sdk.dart';
 import 'mocks.dart';
+import 'utils.dart';
 
 main() {
-  groupSep = ' | ';
+  initializeTestEnvironment();
 
   defineReflectiveTests(AnalysisDomainTest);
   defineReflectiveTests(SetSubscriptionsTest);
@@ -39,9 +40,14 @@ main() {
     ExtensionManager manager = new ExtensionManager();
     ServerPlugin serverPlugin = new ServerPlugin();
     manager.processPlugins([serverPlugin]);
-    server = new AnalysisServer(serverChannel, resourceProvider,
-        new MockPackageMapProvider(), null, serverPlugin,
-        new AnalysisServerOptions(), new MockSdk(),
+    server = new AnalysisServer(
+        serverChannel,
+        resourceProvider,
+        new MockPackageMapProvider(),
+        null,
+        serverPlugin,
+        new AnalysisServerOptions(),
+        new MockSdk(),
         InstrumentationService.NULL_SERVICE);
     handler = new AnalysisDomainHandler(server);
   });
@@ -49,6 +55,46 @@ main() {
   group('updateContent', testUpdateContent);
 
   group('AnalysisDomainHandler', () {
+    group('getReachableSources', () {
+      test('valid sources', () async {
+        String fileA = '/project/a.dart';
+        String fileB = '/project/b.dart';
+        resourceProvider.newFile(fileA, 'import "b.dart";');
+        resourceProvider.newFile(fileB, '');
+
+        server.setAnalysisRoots('0', ['/project/'], [], {});
+
+        await server.onAnalysisComplete;
+
+        var request =
+            new AnalysisGetReachableSourcesParams(fileA).toRequest('0');
+        var response = handler.handleRequest(request);
+
+        var json = response.toJson()[Response.RESULT];
+
+        // Sanity checks.
+        expect(json['sources'], hasLength(6));
+        expect(json['sources']['file:///project/a.dart'],
+            unorderedEquals(['dart:core', 'file:///project/b.dart']));
+        expect(json['sources']['file:///project/b.dart'], ['dart:core']);
+      });
+
+      test('invalid source', () async {
+        resourceProvider.newFile('/project/a.dart', 'import "b.dart";');
+        server.setAnalysisRoots('0', ['/project/'], [], {});
+
+        await server.onAnalysisComplete;
+
+        var request =
+            new AnalysisGetReachableSourcesParams('/does/not/exist.dart')
+                .toRequest('0');
+        var response = handler.handleRequest(request);
+        expect(response.error, isNotNull);
+        expect(response.error.code,
+            RequestErrorCode.GET_REACHABLE_SOURCES_INVALID_FILE);
+      });
+    });
+
     group('setAnalysisRoots', () {
       Response testSetAnalysisRoots(
           List<String> included, List<String> excluded) {
@@ -73,6 +119,22 @@ main() {
             expect(serverRef.getResolvedCompilationUnits(fileB), isEmpty);
           });
         });
+
+        test('not absolute', () async {
+          var response = testSetAnalysisRoots([], ['foo/bar']);
+          expect(
+              response,
+              isResponseFailure(
+                  '0', RequestErrorCode.INVALID_FILE_PATH_FORMAT));
+        });
+
+        test('not normalized', () async {
+          var response = testSetAnalysisRoots([], ['/foo/../bar']);
+          expect(
+              response,
+              isResponseFailure(
+                  '0', RequestErrorCode.INVALID_FILE_PATH_FORMAT));
+        });
       });
 
       group('included', () {
@@ -88,6 +150,34 @@ main() {
             var units = serverRef.getResolvedCompilationUnits(file);
             expect(units, hasLength(1));
           });
+        });
+
+        test('nonexistent folder', () async {
+          String fileB = '/project_b/b.dart';
+          resourceProvider.newFile(fileB, '// b');
+          var response = testSetAnalysisRoots(['/project_a', '/project_b'], []);
+          var serverRef = server;
+          expect(response, isResponseSuccess('0'));
+          // Non-existence of /project_a should not prevent files in /project_b
+          // from being analyzed.
+          await server.onAnalysisComplete;
+          expect(serverRef.getResolvedCompilationUnits(fileB), hasLength(1));
+        });
+
+        test('not absolute', () async {
+          var response = testSetAnalysisRoots(['foo/bar'], []);
+          expect(
+              response,
+              isResponseFailure(
+                  '0', RequestErrorCode.INVALID_FILE_PATH_FORMAT));
+        });
+
+        test('not normalized', () async {
+          var response = testSetAnalysisRoots(['/foo/../bar'], []);
+          expect(
+              response,
+              isResponseFailure(
+                  '0', RequestErrorCode.INVALID_FILE_PATH_FORMAT));
         });
       });
     });
@@ -109,8 +199,9 @@ main() {
         resourceProvider.newFile('/p2/b.dart', 'library b;');
         resourceProvider.newFile('/p2/c.dart', 'library c;');
 
-        var setRootsRequest = new AnalysisSetAnalysisRootsParams(
-            ['/p1', '/p2'], []).toRequest('0');
+        var setRootsRequest =
+            new AnalysisSetAnalysisRootsParams(['/p1', '/p2'], [])
+                .toRequest('0');
         var setRootsResponse = handler.handleRequest(setRootsRequest);
         expect(setRootsResponse, isResponseSuccess('0'));
 
@@ -132,8 +223,9 @@ main() {
 
     group('updateOptions', () {
       test('invalid', () {
-        var request = new Request(
-            '0', ANALYSIS_UPDATE_OPTIONS, {OPTIONS: {'not-an-option': true}});
+        var request = new Request('0', ANALYSIS_UPDATE_OPTIONS, {
+          OPTIONS: {'not-an-option': true}
+        });
         var response = handler.handleRequest(request);
         // Invalid options should be silently ignored.
         expect(response, isResponseSuccess('0'));
@@ -156,7 +248,9 @@ testUpdateContent() {
     helper.createSingleFileProject('// empty');
     return helper.onAnalysisComplete.then((_) {
       Request request = new Request('0', ANALYSIS_UPDATE_CONTENT, {
-        'files': {helper.testFile: {TYPE: 'foo',}}
+        'files': {
+          helper.testFile: {TYPE: 'foo',}
+        }
       });
       Response response = helper.handler.handleRequest(request);
       expect(response, isResponseFailure('0'));
@@ -291,7 +385,9 @@ class AnalysisDomainTest extends AbstractAnalysisTest {
     // Prepare a source file that has errors because it refers to an unknown
     // package.
     String pkgFile = '/packages/pkgA/libA.dart';
-    resourceProvider.newFile(pkgFile, '''
+    resourceProvider.newFile(
+        pkgFile,
+        '''
 library lib_a;
 class A {}
 ''');
@@ -322,12 +418,15 @@ f(A a) {
   test_setRoots_packages() {
     // prepare package
     String pkgFile = '/packages/pkgA/libA.dart';
-    resourceProvider.newFile(pkgFile, '''
+    resourceProvider.newFile(
+        pkgFile,
+        '''
 library lib_a;
 class A {}
 ''');
-    packageMapProvider.packageMap['pkgA'] =
-        [resourceProvider.getResource('/packages/pkgA')];
+    packageMapProvider.packageMap['pkgA'] = [
+      resourceProvider.getResource('/packages/pkgA')
+    ];
     addTestFile('''
 import 'package:pkgA/libA.dart';
 main(A a) {
@@ -368,9 +467,14 @@ class AnalysisTestHelper {
     ExtensionManager manager = new ExtensionManager();
     ServerPlugin serverPlugin = new ServerPlugin();
     manager.processPlugins([serverPlugin]);
-    server = new AnalysisServer(serverChannel, resourceProvider,
-        new MockPackageMapProvider(), null, serverPlugin,
-        new AnalysisServerOptions(), new MockSdk(),
+    server = new AnalysisServer(
+        serverChannel,
+        resourceProvider,
+        new MockPackageMapProvider(),
+        null,
+        serverPlugin,
+        new AnalysisServerOptions(),
+        new MockSdk(),
         InstrumentationService.NULL_SERVICE);
     handler = new AnalysisDomainHandler(server);
     // listen for notifications
@@ -593,7 +697,9 @@ class SetSubscriptionsTest extends AbstractAnalysisTest {
 
   test_afterAnalysis_packageFile_external() async {
     String pkgFile = '/packages/pkgA/lib/libA.dart';
-    resourceProvider.newFile(pkgFile, '''
+    resourceProvider.newFile(
+        pkgFile,
+        '''
 library lib_a;
 class A {}
 ''');
@@ -623,11 +729,15 @@ main() {
     String pkgB = '/pkgA';
     String pkgFileA = '$pkgA/lib/libA.dart';
     String pkgFileB = '$pkgA/lib/libB.dart';
-    resourceProvider.newFile(pkgFileA, '''
+    resourceProvider.newFile(
+        pkgFileA,
+        '''
 library lib_a;
 class A {}
 ''');
-    resourceProvider.newFile(pkgFileB, '''
+    resourceProvider.newFile(
+        pkgFileB,
+        '''
 import 'package:pkgA/libA.dart';
 main() {
   new A();
@@ -657,7 +767,9 @@ main() {
 
   test_afterAnalysis_packageFile_notUsed() async {
     String pkgFile = '/packages/pkgA/lib/libA.dart';
-    resourceProvider.newFile(pkgFile, '''
+    resourceProvider.newFile(
+        pkgFile,
+        '''
 library lib_a;
 class A {}
 ''');

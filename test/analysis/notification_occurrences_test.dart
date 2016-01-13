@@ -6,29 +6,30 @@ library test.analysis.notification.occurrences;
 
 import 'dart:async';
 
+import 'package:analysis_server/plugin/protocol/protocol.dart';
 import 'package:analysis_server/src/constants.dart';
-import 'package:analysis_server/src/protocol.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 import 'package:unittest/unittest.dart';
 
 import '../analysis_abstract.dart';
+import '../utils.dart';
 
 main() {
-  groupSep = ' | ';
+  initializeTestEnvironment();
   defineReflectiveTests(AnalysisNotificationOccurrencesTest);
 }
 
 @reflectiveTest
 class AnalysisNotificationOccurrencesTest extends AbstractAnalysisTest {
   List<Occurrences> occurrencesList;
-  Occurrences testOccurences;
+  Occurrences testOccurrences;
 
   /**
-   * Asserts that there is an offset of [search] in [testOccurences].
+   * Asserts that there is an offset of [search] in [testOccurrences].
    */
   void assertHasOffset(String search) {
     int offset = findOffset(search);
-    expect(testOccurences.offsets, contains(offset));
+    expect(testOccurrences.offsets, contains(offset));
   }
 
   /**
@@ -48,7 +49,7 @@ class AnalysisNotificationOccurrencesTest extends AbstractAnalysisTest {
    * Finds an [Occurrences] with the given [offset] and [length].
    *
    * If [exists] is `true`, then fails if such [Occurrences] does not exist.
-   * Otherwise remembers this it into [testOccurences].
+   * Otherwise remembers this it into [testOccurrences].
    *
    * If [exists] is `false`, then fails if such [Occurrences] exists.
    */
@@ -63,7 +64,7 @@ class AnalysisNotificationOccurrencesTest extends AbstractAnalysisTest {
             fail('Not expected to find (offset=$offset; length=$length) in\n'
                 '${occurrencesList.join('\n')}');
           }
-          testOccurences = occurrences;
+          testOccurrences = occurrences;
           return;
         }
       }
@@ -94,25 +95,23 @@ class AnalysisNotificationOccurrencesTest extends AbstractAnalysisTest {
     createProject();
   }
 
-  test_afterAnalysis() {
+  test_afterAnalysis() async {
     addTestFile('''
 main() {
   var vvv = 42;
   print(vvv);
 }
 ''');
-    return waitForTasksFinished().then((_) {
-      return prepareOccurrences().then((_) {
-        assertHasRegion('vvv =');
-        expect(testOccurences.element.kind, ElementKind.LOCAL_VARIABLE);
-        expect(testOccurences.element.name, 'vvv');
-        assertHasOffset('vvv = 42');
-        assertHasOffset('vvv);');
-      });
-    });
+    await waitForTasksFinished();
+    await prepareOccurrences();
+    assertHasRegion('vvv =');
+    expect(testOccurrences.element.kind, ElementKind.LOCAL_VARIABLE);
+    expect(testOccurrences.element.name, 'vvv');
+    assertHasOffset('vvv = 42');
+    assertHasOffset('vvv);');
   }
 
-  test_field() {
+  test_field() async {
     addTestFile('''
 class A {
   int fff;
@@ -123,26 +122,25 @@ class A {
   }
 }
 ''');
-    return prepareOccurrences().then((_) {
-      assertHasRegion('fff;');
-      expect(testOccurences.element.kind, ElementKind.FIELD);
-      assertHasOffset('fff); // constructor');
-      assertHasOffset('fff = 42;');
-      assertHasOffset('fff); // print');
-    });
+    await prepareOccurrences();
+    assertHasRegion('fff;');
+    expect(testOccurrences.element.kind, ElementKind.FIELD);
+    assertHasOffset('fff); // constructor');
+    assertHasOffset('fff = 42;');
+    assertHasOffset('fff); // print');
   }
 
-  test_field_unresolved() {
+  test_field_unresolved() async {
     addTestFile('''
 class A {
   A(this.noSuchField);
 }
 ''');
     // no checks for occurrences, just ensure that there is no NPE
-    return prepareOccurrences();
+    await prepareOccurrences();
   }
 
-  test_localVariable() {
+  test_localVariable() async {
     addTestFile('''
 main() {
   var vvv = 42;
@@ -150,17 +148,16 @@ main() {
   print(vvv);
 }
 ''');
-    return prepareOccurrences().then((_) {
-      assertHasRegion('vvv =');
-      expect(testOccurences.element.kind, ElementKind.LOCAL_VARIABLE);
-      expect(testOccurences.element.name, 'vvv');
-      assertHasOffset('vvv = 42');
-      assertHasOffset('vvv += 5');
-      assertHasOffset('vvv);');
-    });
+    await prepareOccurrences();
+    assertHasRegion('vvv =');
+    expect(testOccurrences.element.kind, ElementKind.LOCAL_VARIABLE);
+    expect(testOccurrences.element.name, 'vvv');
+    assertHasOffset('vvv = 42');
+    assertHasOffset('vvv += 5');
+    assertHasOffset('vvv);');
   }
 
-  test_memberField() {
+  test_memberField() async {
     addTestFile('''
 class A<T> {
   T fff;
@@ -172,15 +169,14 @@ main() {
   b.fff = 2;
 }
 ''');
-    return prepareOccurrences().then((_) {
-      assertHasRegion('fff;');
-      expect(testOccurences.element.kind, ElementKind.FIELD);
-      assertHasOffset('fff = 1;');
-      assertHasOffset('fff = 2;');
-    });
+    await prepareOccurrences();
+    assertHasRegion('fff;');
+    expect(testOccurrences.element.kind, ElementKind.FIELD);
+    assertHasOffset('fff = 1;');
+    assertHasOffset('fff = 2;');
   }
 
-  test_memberMethod() {
+  test_memberMethod() async {
     addTestFile('''
 class A<T> {
   T mmm() {}
@@ -192,15 +188,14 @@ main() {
   b.mmm(); // b
 }
 ''');
-    return prepareOccurrences().then((_) {
-      assertHasRegion('mmm() {}');
-      expect(testOccurences.element.kind, ElementKind.METHOD);
-      assertHasOffset('mmm(); // a');
-      assertHasOffset('mmm(); // b');
-    });
+    await prepareOccurrences();
+    assertHasRegion('mmm() {}');
+    expect(testOccurrences.element.kind, ElementKind.METHOD);
+    assertHasOffset('mmm(); // a');
+    assertHasOffset('mmm(); // b');
   }
 
-  test_topLevelVariable() {
+  test_topLevelVariable() async {
     addTestFile('''
 var VVV = 1;
 main() {
@@ -208,15 +203,14 @@ main() {
   print(VVV);
 }
 ''');
-    return prepareOccurrences().then((_) {
-      assertHasRegion('VVV = 1;');
-      expect(testOccurences.element.kind, ElementKind.TOP_LEVEL_VARIABLE);
-      assertHasOffset('VVV = 2;');
-      assertHasOffset('VVV);');
-    });
+    await prepareOccurrences();
+    assertHasRegion('VVV = 1;');
+    expect(testOccurrences.element.kind, ElementKind.TOP_LEVEL_VARIABLE);
+    assertHasOffset('VVV = 2;');
+    assertHasOffset('VVV);');
   }
 
-  test_type_class() {
+  test_type_class() async {
     addTestFile('''
 main() {
   int a = 1;
@@ -225,18 +219,17 @@ main() {
 }
 int VVV = 4;
 ''');
-    return prepareOccurrences().then((_) {
-      assertHasRegion('int a');
-      expect(testOccurences.element.kind, ElementKind.CLASS);
-      expect(testOccurences.element.name, 'int');
-      assertHasOffset('int a');
-      assertHasOffset('int b');
-      assertHasOffset('int c');
-      assertHasOffset('int VVV');
-    });
+    await prepareOccurrences();
+    assertHasRegion('int a');
+    expect(testOccurrences.element.kind, ElementKind.CLASS);
+    expect(testOccurrences.element.name, 'int');
+    assertHasOffset('int a');
+    assertHasOffset('int b');
+    assertHasOffset('int c');
+    assertHasOffset('int VVV');
   }
 
-  test_type_dynamic() {
+  test_type_dynamic() async {
     addTestFile('''
 main() {
   dynamic a = 1;
@@ -244,20 +237,18 @@ main() {
 }
 dynamic V = 3;
 ''');
-    return prepareOccurrences().then((_) {
-      int offset = findOffset('dynamic a');
-      findRegion(offset, 'dynamic'.length, false);
-    });
+    await prepareOccurrences();
+    int offset = findOffset('dynamic a');
+    findRegion(offset, 'dynamic'.length, false);
   }
 
-  test_type_void() {
+  test_type_void() async {
     addTestFile('''
 void main() {
 }
 ''');
-    return prepareOccurrences().then((_) {
-      int offset = findOffset('void main()');
-      findRegion(offset, 'void'.length, false);
-    });
+    await prepareOccurrences();
+    int offset = findOffset('void main()');
+    findRegion(offset, 'void'.length, false);
   }
 }

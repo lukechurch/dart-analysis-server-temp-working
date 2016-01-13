@@ -4,9 +4,9 @@
 
 library test.analysis.updateContent;
 
+import 'package:analysis_server/plugin/protocol/protocol.dart';
 import 'package:analysis_server/src/analysis_server.dart';
 import 'package:analysis_server/src/constants.dart';
-import 'package:analysis_server/src/protocol.dart';
 import 'package:analysis_server/src/services/index/index.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/src/generated/ast.dart';
@@ -17,9 +17,10 @@ import 'package:typed_mock/typed_mock.dart';
 import 'package:unittest/unittest.dart';
 
 import '../analysis_abstract.dart';
+import '../utils.dart';
 
 main() {
-  groupSep = ' | ';
+  initializeTestEnvironment();
   defineReflectiveTests(UpdateContentTest);
 }
 
@@ -55,8 +56,9 @@ class UpdateContentTest extends AbstractAnalysisTest {
     createProject();
     addTestFile('');
     await server.onAnalysisComplete;
-    server.setAnalysisSubscriptions(
-        {AnalysisService.NAVIGATION: [testFile].toSet()});
+    server.setAnalysisSubscriptions({
+      AnalysisService.NAVIGATION: [testFile].toSet()
+    });
     // update file, analyze, but don't sent notifications
     navigationCount = 0;
     server.updateContent('1', {testFile: new AddContentOverlay('foo() {}')});
@@ -93,7 +95,7 @@ class UpdateContentTest extends AbstractAnalysisTest {
     createProject();
     addTestFile('main() { print(1); }');
     await server.onAnalysisComplete;
-    verify(server.index.indexUnit(anyObject, testUnitMatcher)).times(1);
+    verify(server.index.index(anyObject, testUnitMatcher)).times(1);
     // add an overlay
     server.updateContent(
         '1', {testFile: new AddContentOverlay('main() { print(2); }')});
@@ -105,27 +107,34 @@ class UpdateContentTest extends AbstractAnalysisTest {
     server.updateContent('2', {testFile: new RemoveContentOverlay()});
     // Validate that at the end the unit was indexed.
     await server.onAnalysisComplete;
-    verify(server.index.indexUnit(anyObject, testUnitMatcher)).times(2);
+    verify(server.index.index(anyObject, testUnitMatcher)).times(3);
   }
 
   test_multiple_contexts() async {
     String fooPath = '/project1/foo.dart';
-    resourceProvider.newFile(fooPath, '''
+    resourceProvider.newFile(
+        fooPath,
+        '''
 library foo;
 import '../project2/baz.dart';
 main() { f(); }''');
     String barPath = '/project2/bar.dart';
-    resourceProvider.newFile(barPath, '''
+    resourceProvider.newFile(
+        barPath,
+        '''
 library bar;
 import 'baz.dart';
 main() { f(); }''');
     String bazPath = '/project2/baz.dart';
-    resourceProvider.newFile(bazPath, '''
+    resourceProvider.newFile(
+        bazPath,
+        '''
 library baz;
 f(int i) {}
 ''');
-    Request request = new AnalysisSetAnalysisRootsParams(
-        ['/project1', '/project2'], []).toRequest('0');
+    Request request =
+        new AnalysisSetAnalysisRootsParams(['/project1', '/project2'], [])
+            .toRequest('0');
     handleSuccessfulRequest(request);
     {
       await server.onAnalysisComplete;
@@ -154,8 +163,9 @@ f() {}
     String filePath = '/User/project1/test.dart';
     Folder folder1 = resourceProvider.newFolder('/User/project1');
     Folder folder2 = resourceProvider.newFolder('/User/project2');
-    Request request = new AnalysisSetAnalysisRootsParams(
-        [folder1.path, folder2.path], []).toRequest('0');
+    Request request =
+        new AnalysisSetAnalysisRootsParams([folder1.path, folder2.path], [])
+            .toRequest('0');
     handleSuccessfulRequest(request);
     // exactly 2 contexts
     expect(server.folderMap, hasLength(2));
@@ -262,6 +272,4 @@ class _ArgumentMatcher_CompilationUnit extends ArgumentMatcher {
   }
 }
 
-class _MockIndex extends TypedMock implements Index {
-  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
+class _MockIndex extends TypedMock implements Index {}

@@ -153,6 +153,30 @@ final Matcher isAnalysisGetHoverResult = new LazyMatcher(() => new MatchesJsonOb
   }));
 
 /**
+ * analysis.getReachableSources params
+ *
+ * {
+ *   "file": FilePath
+ * }
+ */
+final Matcher isAnalysisGetReachableSourcesParams = new LazyMatcher(() => new MatchesJsonObject(
+  "analysis.getReachableSources params", {
+    "file": isFilePath
+  }));
+
+/**
+ * analysis.getReachableSources result
+ *
+ * {
+ *   "sources": Map<String, List<String>>
+ * }
+ */
+final Matcher isAnalysisGetReachableSourcesResult = new LazyMatcher(() => new MatchesJsonObject(
+  "analysis.getReachableSources result", {
+    "sources": isMapOf(isString, isListOf(isString))
+  }));
+
+/**
  * analysis.getLibraryDependencies params
  */
 final Matcher isAnalysisGetLibraryDependenciesParams = isNull;
@@ -398,6 +422,22 @@ final Matcher isAnalysisHighlightsParams = new LazyMatcher(() => new MatchesJson
   }));
 
 /**
+ * analysis.implemented params
+ *
+ * {
+ *   "file": FilePath
+ *   "classes": List<ImplementedClass>
+ *   "members": List<ImplementedMember>
+ * }
+ */
+final Matcher isAnalysisImplementedParams = new LazyMatcher(() => new MatchesJsonObject(
+  "analysis.implemented params", {
+    "file": isFilePath,
+    "classes": isListOf(isImplementedClass),
+    "members": isListOf(isImplementedMember)
+  }));
+
+/**
  * analysis.invalidate params
  *
  * {
@@ -452,13 +492,18 @@ final Matcher isAnalysisOccurrencesParams = new LazyMatcher(() => new MatchesJso
  *
  * {
  *   "file": FilePath
+ *   "kind": FileKind
+ *   "libraryName": optional String
  *   "outline": Outline
  * }
  */
 final Matcher isAnalysisOutlineParams = new LazyMatcher(() => new MatchesJsonObject(
   "analysis.outline params", {
     "file": isFilePath,
+    "kind": isFileKind,
     "outline": isOutline
+  }, optionalFields: {
+    "libraryName": isString
   }));
 
 /**
@@ -629,12 +674,15 @@ final Matcher isSearchFindTopLevelDeclarationsResult = new LazyMatcher(() => new
  * {
  *   "file": FilePath
  *   "offset": int
+ *   "superOnly": optional bool
  * }
  */
 final Matcher isSearchGetTypeHierarchyParams = new LazyMatcher(() => new MatchesJsonObject(
   "search.getTypeHierarchy params", {
     "file": isFilePath,
     "offset": isInt
+  }, optionalFields: {
+    "superOnly": isBool
   }));
 
 /**
@@ -853,6 +901,30 @@ final Matcher isEditSortMembersResult = new LazyMatcher(() => new MatchesJsonObj
   }));
 
 /**
+ * edit.organizeDirectives params
+ *
+ * {
+ *   "file": FilePath
+ * }
+ */
+final Matcher isEditOrganizeDirectivesParams = new LazyMatcher(() => new MatchesJsonObject(
+  "edit.organizeDirectives params", {
+    "file": isFilePath
+  }));
+
+/**
+ * edit.organizeDirectives result
+ *
+ * {
+ *   "edit": SourceFileEdit
+ * }
+ */
+final Matcher isEditOrganizeDirectivesResult = new LazyMatcher(() => new MatchesJsonObject(
+  "edit.organizeDirectives result", {
+    "edit": isSourceFileEdit
+  }));
+
+/**
  * execution.createContext params
  *
  * {
@@ -959,6 +1031,23 @@ final Matcher isExecutionLaunchDataParams = new LazyMatcher(() => new MatchesJso
   }));
 
 /**
+ * diagnostic.getDiagnostics params
+ */
+final Matcher isDiagnosticGetDiagnosticsParams = isNull;
+
+/**
+ * diagnostic.getDiagnostics result
+ *
+ * {
+ *   "contexts": List<ContextData>
+ * }
+ */
+final Matcher isDiagnosticGetDiagnosticsResult = new LazyMatcher(() => new MatchesJsonObject(
+  "diagnostic.getDiagnostics result", {
+    "contexts": isListOf(isContextData)
+  }));
+
+/**
  * AddContentOverlay
  *
  * {
@@ -981,6 +1070,7 @@ final Matcher isAddContentOverlay = new LazyMatcher(() => new MatchesJsonObject(
  *   "location": Location
  *   "message": String
  *   "correction": optional String
+ *   "hasFix": optional bool
  * }
  */
 final Matcher isAnalysisError = new LazyMatcher(() => new MatchesJsonObject(
@@ -990,7 +1080,8 @@ final Matcher isAnalysisError = new LazyMatcher(() => new MatchesJsonObject(
     "location": isLocation,
     "message": isString
   }, optionalFields: {
-    "correction": isString
+    "correction": isString,
+    "hasFix": isBool
   }));
 
 /**
@@ -1055,6 +1146,7 @@ final Matcher isAnalysisErrorType = new MatchesEnum("AnalysisErrorType", [
  *   "enableDeferredLoading": optional bool
  *   "enableEnums": optional bool
  *   "enableNullAwareOperators": optional bool
+ *   "enableSuperMixins": optional bool
  *   "generateDart2jsHints": optional bool
  *   "generateHints": optional bool
  *   "generateLints": optional bool
@@ -1066,6 +1158,7 @@ final Matcher isAnalysisOptions = new LazyMatcher(() => new MatchesJsonObject(
     "enableDeferredLoading": isBool,
     "enableEnums": isBool,
     "enableNullAwareOperators": isBool,
+    "enableSuperMixins": isBool,
     "generateDart2jsHints": isBool,
     "generateHints": isBool,
     "generateLints": isBool
@@ -1077,6 +1170,7 @@ final Matcher isAnalysisOptions = new LazyMatcher(() => new MatchesJsonObject(
  * enum {
  *   FOLDING
  *   HIGHLIGHTS
+ *   IMPLEMENTED
  *   INVALIDATE
  *   NAVIGATION
  *   OCCURRENCES
@@ -1087,6 +1181,7 @@ final Matcher isAnalysisOptions = new LazyMatcher(() => new MatchesJsonObject(
 final Matcher isAnalysisService = new MatchesEnum("AnalysisService", [
   "FOLDING",
   "HIGHLIGHTS",
+  "IMPLEMENTED",
   "INVALIDATE",
   "NAVIGATION",
   "OCCURRENCES",
@@ -1205,6 +1300,26 @@ final Matcher isCompletionSuggestionKind = new MatchesEnum("CompletionSuggestion
 ]);
 
 /**
+ * ContextData
+ *
+ * {
+ *   "name": String
+ *   "explicitFileCount": int
+ *   "implicitFileCount": int
+ *   "workItemQueueLength": int
+ *   "cacheEntryExceptions": List<String>
+ * }
+ */
+final Matcher isContextData = new LazyMatcher(() => new MatchesJsonObject(
+  "ContextData", {
+    "name": isString,
+    "explicitFileCount": isInt,
+    "implicitFileCount": isInt,
+    "workItemQueueLength": isInt,
+    "cacheEntryExceptions": isListOf(isString)
+  }));
+
+/**
  * Element
  *
  * {
@@ -1240,6 +1355,7 @@ final Matcher isElement = new LazyMatcher(() => new MatchesJsonObject(
  *   ENUM
  *   ENUM_CONSTANT
  *   FIELD
+ *   FILE
  *   FUNCTION
  *   FUNCTION_TYPE_ALIAS
  *   GETTER
@@ -1265,6 +1381,7 @@ final Matcher isElementKind = new MatchesEnum("ElementKind", [
   "ENUM",
   "ENUM_CONSTANT",
   "FIELD",
+  "FILE",
   "FUNCTION",
   "FUNCTION_TYPE_ALIAS",
   "GETTER",
@@ -1329,6 +1446,19 @@ final Matcher isExecutionContextId = isString;
  */
 final Matcher isExecutionService = new MatchesEnum("ExecutionService", [
   "LAUNCH_DATA"
+]);
+
+/**
+ * FileKind
+ *
+ * enum {
+ *   LIBRARY
+ *   PART
+ * }
+ */
+final Matcher isFileKind = new MatchesEnum("FileKind", [
+  "LIBRARY",
+  "PART"
 ]);
 
 /**
@@ -1586,6 +1716,34 @@ final Matcher isHoverInformation = new LazyMatcher(() => new MatchesJsonObject(
     "parameter": isString,
     "propagatedType": isString,
     "staticType": isString
+  }));
+
+/**
+ * ImplementedClass
+ *
+ * {
+ *   "offset": int
+ *   "length": int
+ * }
+ */
+final Matcher isImplementedClass = new LazyMatcher(() => new MatchesJsonObject(
+  "ImplementedClass", {
+    "offset": isInt,
+    "length": isInt
+  }));
+
+/**
+ * ImplementedMember
+ *
+ * {
+ *   "offset": int
+ *   "length": int
+ * }
+ */
+final Matcher isImplementedMember = new LazyMatcher(() => new MatchesJsonObject(
+  "ImplementedMember", {
+    "offset": isInt,
+    "length": isInt
   }));
 
 /**
@@ -1936,16 +2094,20 @@ final Matcher isRequestError = new LazyMatcher(() => new MatchesJsonObject(
  *
  * enum {
  *   CONTENT_MODIFIED
+ *   FILE_NOT_ANALYZED
  *   FORMAT_INVALID_FILE
  *   FORMAT_WITH_ERRORS
  *   GET_ERRORS_INVALID_FILE
  *   GET_NAVIGATION_INVALID_FILE
+ *   GET_REACHABLE_SOURCES_INVALID_FILE
  *   INVALID_ANALYSIS_ROOT
  *   INVALID_EXECUTION_CONTEXT
+ *   INVALID_FILE_PATH_FORMAT
  *   INVALID_OVERLAY_CHANGE
  *   INVALID_PARAMETER
  *   INVALID_REQUEST
  *   NO_INDEX_GENERATED
+ *   ORGANIZE_DIRECTIVES_ERROR
  *   REFACTORING_REQUEST_CANCELLED
  *   SERVER_ALREADY_STARTED
  *   SERVER_ERROR
@@ -1959,16 +2121,20 @@ final Matcher isRequestError = new LazyMatcher(() => new MatchesJsonObject(
  */
 final Matcher isRequestErrorCode = new MatchesEnum("RequestErrorCode", [
   "CONTENT_MODIFIED",
+  "FILE_NOT_ANALYZED",
   "FORMAT_INVALID_FILE",
   "FORMAT_WITH_ERRORS",
   "GET_ERRORS_INVALID_FILE",
   "GET_NAVIGATION_INVALID_FILE",
+  "GET_REACHABLE_SOURCES_INVALID_FILE",
   "INVALID_ANALYSIS_ROOT",
   "INVALID_EXECUTION_CONTEXT",
+  "INVALID_FILE_PATH_FORMAT",
   "INVALID_OVERLAY_CHANGE",
   "INVALID_PARAMETER",
   "INVALID_REQUEST",
   "NO_INDEX_GENERATED",
+  "ORGANIZE_DIRECTIVES_ERROR",
   "REFACTORING_REQUEST_CANCELLED",
   "SERVER_ALREADY_STARTED",
   "SERVER_ERROR",
@@ -2142,6 +2308,8 @@ final Matcher isConvertMethodToGetterOptions = isNull;
  * extractLocalVariable feedback
  *
  * {
+ *   "coveringExpressionOffsets": optional List<int>
+ *   "coveringExpressionLengths": optional List<int>
  *   "names": List<String>
  *   "offsets": List<int>
  *   "lengths": List<int>
@@ -2152,6 +2320,9 @@ final Matcher isExtractLocalVariableFeedback = new LazyMatcher(() => new Matches
     "names": isListOf(isString),
     "offsets": isListOf(isInt),
     "lengths": isListOf(isInt)
+  }, optionalFields: {
+    "coveringExpressionOffsets": isListOf(isInt),
+    "coveringExpressionLengths": isListOf(isInt)
   }));
 
 /**

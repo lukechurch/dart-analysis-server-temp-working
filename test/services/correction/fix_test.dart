@@ -4,8 +4,12 @@
 
 library test.services.correction.fix;
 
-import 'package:analysis_server/edit/fix/fix_core.dart';
-import 'package:analysis_server/src/protocol.dart' hide AnalysisError;
+import 'dart:async';
+
+import 'package:analysis_server/plugin/edit/fix/fix_core.dart';
+import 'package:analysis_server/plugin/edit/fix/fix_dart.dart';
+import 'package:analysis_server/plugin/protocol/protocol.dart'
+    hide AnalysisError;
 import 'package:analysis_server/src/services/correction/fix.dart';
 import 'package:analysis_server/src/services/correction/fix_internal.dart';
 import 'package:analyzer/file_system/file_system.dart';
@@ -18,9 +22,10 @@ import 'package:unittest/unittest.dart';
 
 import '../../abstract_context.dart';
 import '../../abstract_single_unit.dart';
+import '../../utils.dart';
 
 main() {
-  groupSep = ' | ';
+  initializeTestEnvironment();
   defineReflectiveTests(FixProcessorTest);
 }
 
@@ -40,14 +45,16 @@ class FixProcessorTest extends AbstractSingleUnitTest {
   SourceChange change;
   String resultCode;
 
-  void assert_undefinedFunction_create_returnType_bool(String lineWithTest) {
+  assert_undefinedFunction_create_returnType_bool(String lineWithTest) async {
     resolveTestUnit('''
 main() {
   bool b = true;
   $lineWithTest
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   bool b = true;
   $lineWithTest
@@ -58,9 +65,9 @@ bool test() {
 ''');
   }
 
-  void assertHasFix(FixKind kind, String expected) {
+  assertHasFix(FixKind kind, String expected) async {
     AnalysisError error = _findErrorToFix();
-    fix = _assertHasFix(kind, error);
+    fix = await _assertHasFix(kind, error);
     change = fix.change;
     // apply to "file"
     List<SourceFileEdit> fileEdits = change.edits;
@@ -70,9 +77,9 @@ bool test() {
     expect(resultCode, expected);
   }
 
-  void assertNoFix(FixKind kind) {
+  assertNoFix(FixKind kind) async {
     AnalysisError error = _findErrorToFix();
-    List<Fix> fixes = _computeFixes(error);
+    List<Fix> fixes = await _computeFixes(error);
     for (Fix fix in fixes) {
       if (fix.kind == kind) {
         throw fail('Unexpected fix $kind in\n${fixes.join('\n')}');
@@ -105,7 +112,7 @@ bool test() {
     verifyNoTestUnitErrors = false;
   }
 
-  void test_addFieldFormalParameters_hasRequiredParameter() {
+  test_addFieldFormalParameters_hasRequiredParameter() async {
     resolveTestUnit('''
 class Test {
   final int a;
@@ -114,7 +121,9 @@ class Test {
   Test(this.a);
 }
 ''');
-    assertHasFix(DartFixKind.ADD_FIELD_FORMAL_PARAMETERS, '''
+    await assertHasFix(
+        DartFixKind.ADD_FIELD_FORMAL_PARAMETERS,
+        '''
 class Test {
   final int a;
   final int b;
@@ -124,7 +133,7 @@ class Test {
 ''');
   }
 
-  void test_addFieldFormalParameters_noParameters() {
+  test_addFieldFormalParameters_noParameters() async {
     resolveTestUnit('''
 class Test {
   final int a;
@@ -133,7 +142,9 @@ class Test {
   Test();
 }
 ''');
-    assertHasFix(DartFixKind.ADD_FIELD_FORMAL_PARAMETERS, '''
+    await assertHasFix(
+        DartFixKind.ADD_FIELD_FORMAL_PARAMETERS,
+        '''
 class Test {
   final int a;
   final int b;
@@ -143,7 +154,7 @@ class Test {
 ''');
   }
 
-  void test_addFieldFormalParameters_noRequiredParameter() {
+  test_addFieldFormalParameters_noRequiredParameter() async {
     resolveTestUnit('''
 class Test {
   final int a;
@@ -152,7 +163,9 @@ class Test {
   Test([this.c]);
 }
 ''');
-    assertHasFix(DartFixKind.ADD_FIELD_FORMAL_PARAMETERS, '''
+    await assertHasFix(
+        DartFixKind.ADD_FIELD_FORMAL_PARAMETERS,
+        '''
 class Test {
   final int a;
   final int b;
@@ -162,14 +175,26 @@ class Test {
 ''');
   }
 
-  void test_addMissingParameter_function_positional_hasZero() {
+  test_addMissingParameter_function_positional_hasNamed() async {
+    resolveTestUnit('''
+test({int a}) {}
+main() {
+  test(1);
+}
+''');
+    await assertNoFix(DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL);
+  }
+
+  test_addMissingParameter_function_positional_hasZero() async {
     resolveTestUnit('''
 test() {}
 main() {
   test(1);
 }
 ''');
-    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL, '''
+    await assertHasFix(
+        DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL,
+        '''
 test([int i]) {}
 main() {
   test(1);
@@ -177,14 +202,33 @@ main() {
 ''');
   }
 
-  void test_addMissingParameter_function_required_hasOne() {
+  test_addMissingParameter_function_required_hasNamed() async {
+    resolveTestUnit('''
+test({int a}) {}
+main() {
+  test(1);
+}
+''');
+    await assertHasFix(
+        DartFixKind.ADD_MISSING_PARAMETER_REQUIRED,
+        '''
+test(int i, {int a}) {}
+main() {
+  test(1);
+}
+''');
+  }
+
+  test_addMissingParameter_function_required_hasOne() async {
     resolveTestUnit('''
 test(int a) {}
 main() {
   test(1, 2.0);
 }
 ''');
-    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+    await assertHasFix(
+        DartFixKind.ADD_MISSING_PARAMETER_REQUIRED,
+        '''
 test(int a, double d) {}
 main() {
   test(1, 2.0);
@@ -192,14 +236,16 @@ main() {
 ''');
   }
 
-  void test_addMissingParameter_function_required_hasZero() {
+  test_addMissingParameter_function_required_hasZero() async {
     resolveTestUnit('''
 test() {}
 main() {
   test(1);
 }
 ''');
-    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+    await assertHasFix(
+        DartFixKind.ADD_MISSING_PARAMETER_REQUIRED,
+        '''
 test(int i) {}
 main() {
   test(1);
@@ -207,7 +253,7 @@ main() {
 ''');
   }
 
-  void test_addMissingParameter_method_positional_hasOne() {
+  test_addMissingParameter_method_positional_hasOne() async {
     resolveTestUnit('''
 class A {
   test(int a) {}
@@ -216,7 +262,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL, '''
+    await assertHasFix(
+        DartFixKind.ADD_MISSING_PARAMETER_POSITIONAL,
+        '''
 class A {
   test(int a, [double d]) {}
   main() {
@@ -226,7 +274,7 @@ class A {
 ''');
   }
 
-  void test_addMissingParameter_method_required_hasOne() {
+  test_addMissingParameter_method_required_hasOne() async {
     resolveTestUnit('''
 class A {
   test(int a) {}
@@ -235,7 +283,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+    await assertHasFix(
+        DartFixKind.ADD_MISSING_PARAMETER_REQUIRED,
+        '''
 class A {
   test(int a, double d) {}
   main() {
@@ -245,7 +295,7 @@ class A {
 ''');
   }
 
-  void test_addMissingParameter_method_required_hasZero() {
+  test_addMissingParameter_method_required_hasZero() async {
     resolveTestUnit('''
 class A {
   test() {}
@@ -254,7 +304,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.ADD_MISSING_PARAMETER_REQUIRED, '''
+    await assertHasFix(
+        DartFixKind.ADD_MISSING_PARAMETER_REQUIRED,
+        '''
 class A {
   test(int i) {}
   main() {
@@ -264,7 +316,7 @@ class A {
 ''');
   }
 
-  void test_addPartOfDirective() {
+  test_addPartOfDirective() async {
     String partCode = r'''
 // Comment first.
 // Comment second.
@@ -278,14 +330,16 @@ part 'part.dart';
 ''');
     _performAnalysis();
     AnalysisError error = _findErrorToFix();
-    fix = _assertHasFix(DartFixKind.ADD_PART_OF, error);
+    fix = await _assertHasFix(DartFixKind.ADD_PART_OF, error);
     change = fix.change;
     // apply to "file"
     List<SourceFileEdit> fileEdits = change.edits;
     expect(fileEdits, hasLength(1));
     SourceFileEdit fileEdit = change.edits[0];
     expect(fileEdit.file, '/part.dart');
-    expect(SourceEdit.applySequence(partCode, fileEdit.edits), r'''
+    expect(
+        SourceEdit.applySequence(partCode, fileEdit.edits),
+        r'''
 // Comment first.
 // Comment second.
 
@@ -295,14 +349,14 @@ class A {}
 ''');
   }
 
-  void test_addSync_BAD_nullFunctionBody() {
+  test_addSync_BAD_nullFunctionBody() async {
     resolveTestUnit('''
 var F = await;
 ''');
-    assertNoFix(DartFixKind.ADD_ASYNC);
+    await assertNoFix(DartFixKind.ADD_ASYNC);
   }
 
-  void test_addSync_blockFunctionBody() {
+  test_addSync_blockFunctionBody() async {
     resolveTestUnit('''
 foo() {}
 main() {
@@ -311,37 +365,38 @@ main() {
 ''');
     List<AnalysisError> errors = context.computeErrors(testSource);
     expect(errors, hasLength(2));
-    // ParserError: Expected to find ';'
-    {
-      AnalysisError error = errors[0];
-      expect(error.message, "Expected to find ';'");
-      List<Fix> fixes = _computeFixes(error);
-      expect(fixes, isEmpty);
-    }
-    // Undefined name 'await'
-    {
-      AnalysisError error = errors[1];
-      expect(error.message, "Undefined name 'await'");
-      List<Fix> fixes = _computeFixes(error);
-      // has exactly one fix
-      expect(fixes, hasLength(1));
-      Fix fix = fixes[0];
-      expect(fix.kind, DartFixKind.ADD_ASYNC);
-      // apply to "file"
-      List<SourceFileEdit> fileEdits = fix.change.edits;
-      expect(fileEdits, hasLength(1));
-      resultCode = SourceEdit.applySequence(testCode, fileEdits[0].edits);
-      // verify
-      expect(resultCode, '''
+    String message1 = "Expected to find ';'";
+    String message2 = "Undefined name 'await'";
+    expect(errors.map((e) => e.message), unorderedEquals([message1, message2]));
+    for (AnalysisError error in errors) {
+      if (error.message == message1) {
+        List<Fix> fixes = await _computeFixes(error);
+        expect(fixes, isEmpty);
+      }
+      if (error.message == message2) {
+        List<Fix> fixes = await _computeFixes(error);
+        // has exactly one fix
+        expect(fixes, hasLength(1));
+        Fix fix = fixes[0];
+        expect(fix.kind, DartFixKind.ADD_ASYNC);
+        // apply to "file"
+        List<SourceFileEdit> fileEdits = fix.change.edits;
+        expect(fileEdits, hasLength(1));
+        resultCode = SourceEdit.applySequence(testCode, fileEdits[0].edits);
+        // verify
+        expect(
+            resultCode,
+            '''
 foo() {}
 main() async {
   await foo();
 }
 ''');
+      }
     }
   }
 
-  void test_addSync_expressionFunctionBody() {
+  test_addSync_expressionFunctionBody() async {
     errorFilter = (AnalysisError error) {
       return error.errorCode == StaticWarningCode.UNDEFINED_IDENTIFIER;
     };
@@ -349,26 +404,75 @@ main() async {
 foo() {}
 main() => await foo();
 ''');
-    assertHasFix(DartFixKind.ADD_ASYNC, '''
+    await assertHasFix(
+        DartFixKind.ADD_ASYNC,
+        '''
 foo() {}
 main() async => await foo();
 ''');
   }
 
-  void test_boolean() {
+  test_boolean() async {
     resolveTestUnit('''
 main() {
   boolean v;
 }
 ''');
-    assertHasFix(DartFixKind.REPLACE_BOOLEAN_WITH_BOOL, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_BOOLEAN_WITH_BOOL,
+        '''
 main() {
   bool v;
 }
 ''');
   }
 
-  void test_changeToStaticAccess_method() {
+  test_canBeNullAfterNullAware_chain() async {
+    resolveTestUnit('''
+main(x) {
+  x?.a.b.c;
+}
+''');
+    await assertHasFix(
+        DartFixKind.REPLACE_WITH_NULL_AWARE,
+        '''
+main(x) {
+  x?.a?.b?.c;
+}
+''');
+  }
+
+  test_canBeNullAfterNullAware_methodInvocation() async {
+    resolveTestUnit('''
+main(x) {
+  x?.a.b();
+}
+''');
+    await assertHasFix(
+        DartFixKind.REPLACE_WITH_NULL_AWARE,
+        '''
+main(x) {
+  x?.a?.b();
+}
+''');
+  }
+
+  test_canBeNullAfterNullAware_propertyAccess() async {
+    resolveTestUnit('''
+main(x) {
+  x?.a().b;
+}
+''');
+    await assertHasFix(
+        DartFixKind.REPLACE_WITH_NULL_AWARE,
+        '''
+main(x) {
+  x?.a()?.b;
+}
+''');
+  }
+
+  test_changeToStaticAccess_method() async {
     resolveTestUnit('''
 class A {
   static foo() {}
@@ -377,7 +481,9 @@ main(A a) {
   a.foo();
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO_STATIC_ACCESS, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO_STATIC_ACCESS,
+        '''
 class A {
   static foo() {}
 }
@@ -387,14 +493,18 @@ main(A a) {
 ''');
   }
 
-  void test_changeToStaticAccess_method_importType() {
-    addSource('/libA.dart', r'''
+  test_changeToStaticAccess_method_importType() async {
+    addSource(
+        '/libA.dart',
+        r'''
 library libA;
 class A {
   static foo() {}
 }
 ''');
-    addSource('/libB.dart', r'''
+    addSource(
+        '/libB.dart',
+        r'''
 library libB;
 import 'libA.dart';
 class B extends A {}
@@ -405,7 +515,9 @@ main(B b) {
   b.foo();
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO_STATIC_ACCESS, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO_STATIC_ACCESS,
+        '''
 import 'libB.dart';
 import 'libA.dart';
 main(B b) {
@@ -414,14 +526,16 @@ main(B b) {
 ''');
   }
 
-  void test_changeToStaticAccess_method_prefixLibrary() {
+  test_changeToStaticAccess_method_prefixLibrary() async {
     resolveTestUnit('''
 import 'dart:async' as pref;
 main(pref.Future f) {
   f.wait([]);
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO_STATIC_ACCESS, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO_STATIC_ACCESS,
+        '''
 import 'dart:async' as pref;
 main(pref.Future f) {
   pref.Future.wait([]);
@@ -429,7 +543,7 @@ main(pref.Future f) {
 ''');
   }
 
-  void test_changeToStaticAccess_property() {
+  test_changeToStaticAccess_property() async {
     resolveTestUnit('''
 class A {
   static get foo => 42;
@@ -438,7 +552,9 @@ main(A a) {
   a.foo;
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO_STATIC_ACCESS, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO_STATIC_ACCESS,
+        '''
 class A {
   static get foo => 42;
 }
@@ -448,14 +564,18 @@ main(A a) {
 ''');
   }
 
-  void test_changeToStaticAccess_property_importType() {
-    addSource('/libA.dart', r'''
+  test_changeToStaticAccess_property_importType() async {
+    addSource(
+        '/libA.dart',
+        r'''
 library libA;
 class A {
   static get foo => null;
 }
 ''');
-    addSource('/libB.dart', r'''
+    addSource(
+        '/libB.dart',
+        r'''
 library libB;
 import 'libA.dart';
 class B extends A {}
@@ -466,7 +586,9 @@ main(B b) {
   b.foo;
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO_STATIC_ACCESS, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO_STATIC_ACCESS,
+        '''
 import 'libB.dart';
 import 'libA.dart';
 main(B b) {
@@ -475,13 +597,64 @@ main(B b) {
 ''');
   }
 
-  void test_createClass() {
+  test_changeTypeAnnotation_BAD_multipleVariables() async {
+    resolveTestUnit('''
+main() {
+  String a, b = 42;
+}
+''');
+    await assertNoFix(DartFixKind.CHANGE_TYPE_ANNOTATION);
+  }
+
+  test_changeTypeAnnotation_BAD_notVariableDeclaration() async {
+    resolveTestUnit('''
+main() {
+  String v;
+  v = 42;
+}
+''');
+    await assertNoFix(DartFixKind.CHANGE_TYPE_ANNOTATION);
+  }
+
+  test_changeTypeAnnotation_OK_generic() async {
+    resolveTestUnit('''
+main() {
+  String v = <int>[];
+}
+''');
+    await assertHasFix(
+        DartFixKind.CHANGE_TYPE_ANNOTATION,
+        '''
+main() {
+  List<int> v = <int>[];
+}
+''');
+  }
+
+  test_changeTypeAnnotation_OK_simple() async {
+    resolveTestUnit('''
+main() {
+  String v = 'abc'.length;
+}
+''');
+    await assertHasFix(
+        DartFixKind.CHANGE_TYPE_ANNOTATION,
+        '''
+main() {
+  int v = 'abc'.length;
+}
+''');
+  }
+
+  test_createClass() async {
     resolveTestUnit('''
 main() {
   Test v = null;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CLASS, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CLASS,
+        '''
 main() {
   Test v = null;
 }
@@ -492,7 +665,16 @@ class Test {
     _assertLinkedGroup(change.linkedEditGroups[0], ['Test v =', 'Test {']);
   }
 
-  void test_createClass_inLibraryOfPrefix() {
+  test_createClass_BAD_hasUnresolvedPrefix() async {
+    resolveTestUnit('''
+main() {
+  prefix.Test v = null;
+}
+''');
+    await assertNoFix(DartFixKind.CREATE_CLASS);
+  }
+
+  test_createClass_inLibraryOfPrefix() async {
     String libCode = r'''
 library my.lib;
 
@@ -508,14 +690,16 @@ main() {
 }
 ''');
     AnalysisError error = _findErrorToFix();
-    fix = _assertHasFix(DartFixKind.CREATE_CLASS, error);
+    fix = await _assertHasFix(DartFixKind.CREATE_CLASS, error);
     change = fix.change;
     // apply to "lib.dart"
     List<SourceFileEdit> fileEdits = change.edits;
     expect(fileEdits, hasLength(1));
     SourceFileEdit fileEdit = change.edits[0];
     expect(fileEdit.file, '/lib.dart');
-    expect(SourceEdit.applySequence(libCode, fileEdit.edits), r'''
+    expect(
+        SourceEdit.applySequence(libCode, fileEdit.edits),
+        r'''
 library my.lib;
 
 class A {}
@@ -526,7 +710,7 @@ class Test {
     expect(change.linkedEditGroups, isEmpty);
   }
 
-  void test_createClass_innerLocalFunction() {
+  test_createClass_innerLocalFunction() async {
     resolveTestUnit('''
 f() {
   g() {
@@ -534,7 +718,9 @@ f() {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CLASS, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CLASS,
+        '''
 f() {
   g() {
     Test v = null;
@@ -547,7 +733,52 @@ class Test {
     _assertLinkedGroup(change.linkedEditGroups[0], ['Test v =', 'Test {']);
   }
 
-  void test_createConstructor_forFinalFields() {
+  test_createClass_itemOfList() async {
+    resolveTestUnit('''
+main() {
+  var a = [Test];
+}
+''');
+    await assertHasFix(
+        DartFixKind.CREATE_CLASS,
+        '''
+main() {
+  var a = [Test];
+}
+
+class Test {
+}
+''');
+    _assertLinkedGroup(change.linkedEditGroups[0], ['Test];', 'Test {']);
+  }
+
+  test_createClass_itemOfList_inAnnotation() async {
+    errorFilter = (AnalysisError error) {
+      return error.errorCode == StaticWarningCode.UNDEFINED_IDENTIFIER;
+    };
+    resolveTestUnit('''
+class MyAnnotation {
+  const MyAnnotation(a, b);
+}
+@MyAnnotation(int, const [Test])
+main() {}
+''');
+    await assertHasFix(
+        DartFixKind.CREATE_CLASS,
+        '''
+class MyAnnotation {
+  const MyAnnotation(a, b);
+}
+@MyAnnotation(int, const [Test])
+main() {}
+
+class Test {
+}
+''');
+    _assertLinkedGroup(change.linkedEditGroups[0], ['Test])', 'Test {']);
+  }
+
+  test_createConstructor_forFinalFields() async {
     errorFilter = (AnalysisError error) {
       return error.message.contains("'a'");
     };
@@ -558,7 +789,9 @@ class Test {
   final int c;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS,
+        '''
 class Test {
   final int a;
   final int b = 2;
@@ -569,7 +802,7 @@ class Test {
 ''');
   }
 
-  void test_createConstructor_insteadOfSyntheticDefault() {
+  test_createConstructor_insteadOfSyntheticDefault() async {
     resolveTestUnit('''
 class A {
   int field;
@@ -580,7 +813,9 @@ main() {
   new A(1, 2.0);
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR,
+        '''
 class A {
   int field;
 
@@ -595,7 +830,7 @@ main() {
 ''');
   }
 
-  void test_createConstructor_named() {
+  test_createConstructor_named() async {
     resolveTestUnit('''
 class A {
   method() {}
@@ -604,7 +839,9 @@ main() {
   new A.named(1, 2.0);
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR,
+        '''
 class A {
   A.named(int i, double d) {
   }
@@ -618,23 +855,23 @@ main() {
     _assertLinkedGroup(change.linkedEditGroups[0], ['named(int ', 'named(1']);
   }
 
-  void test_createConstructorForFinalFields_inTopLevelMethod() {
+  test_createConstructorForFinalFields_inTopLevelMethod() async {
     resolveTestUnit('''
 main() {
   final int v;
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS);
+    await assertNoFix(DartFixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS);
   }
 
-  void test_createConstructorForFinalFields_topLevelField() {
+  test_createConstructorForFinalFields_topLevelField() async {
     resolveTestUnit('''
 final int v;
 ''');
-    assertNoFix(DartFixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS);
+    await assertNoFix(DartFixKind.CREATE_CONSTRUCTOR_FOR_FINAL_FIELDS);
   }
 
-  void test_createConstructorSuperExplicit() {
+  test_createConstructorSuperExplicit() async {
     resolveTestUnit('''
 class A {
   A(bool p1, int p2, double p3, String p4, {p5});
@@ -643,7 +880,9 @@ class B extends A {
   B() {}
 }
 ''');
-    assertHasFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION, '''
+    await assertHasFix(
+        DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION,
+        '''
 class A {
   A(bool p1, int p2, double p3, String p4, {p5});
 }
@@ -653,7 +892,7 @@ class B extends A {
 ''');
   }
 
-  void test_createConstructorSuperExplicit_hasInitializers() {
+  test_createConstructorSuperExplicit_hasInitializers() async {
     resolveTestUnit('''
 class A {
   A(int p);
@@ -663,7 +902,9 @@ class B extends A {
   B() : field = 42 {}
 }
 ''');
-    assertHasFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION, '''
+    await assertHasFix(
+        DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION,
+        '''
 class A {
   A(int p);
 }
@@ -674,7 +915,7 @@ class B extends A {
 ''');
   }
 
-  void test_createConstructorSuperExplicit_named() {
+  test_createConstructorSuperExplicit_named() async {
     resolveTestUnit('''
 class A {
   A.named(int p);
@@ -683,7 +924,9 @@ class B extends A {
   B() {}
 }
 ''');
-    assertHasFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION, '''
+    await assertHasFix(
+        DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION,
+        '''
 class A {
   A.named(int p);
 }
@@ -693,7 +936,7 @@ class B extends A {
 ''');
   }
 
-  void test_createConstructorSuperExplicit_named_private() {
+  test_createConstructorSuperExplicit_named_private() async {
     resolveTestUnit('''
 class A {
   A._named(int p);
@@ -702,10 +945,10 @@ class B extends A {
   B() {}
 }
 ''');
-    assertNoFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION);
+    await assertNoFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION);
   }
 
-  void test_createConstructorSuperExplicit_typeArgument() {
+  test_createConstructorSuperExplicit_typeArgument() async {
     resolveTestUnit('''
 class A<T> {
   A(T p);
@@ -714,7 +957,9 @@ class B extends A<int> {
   B();
 }
 ''');
-    assertHasFix(DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION, '''
+    await assertHasFix(
+        DartFixKind.ADD_SUPER_CONSTRUCTOR_INVOCATION,
+        '''
 class A<T> {
   A(T p);
 }
@@ -724,7 +969,7 @@ class B extends A<int> {
 ''');
   }
 
-  void test_createConstructorSuperImplicit() {
+  test_createConstructorSuperImplicit() async {
     resolveTestUnit('''
 class A {
   A(p1, int p2, List<String> p3, [int p4]);
@@ -735,7 +980,9 @@ class B extends A {
   void existingMethod() {}
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR_SUPER,
+        '''
 class A {
   A(p1, int p2, List<String> p3, [int p4]);
 }
@@ -749,7 +996,7 @@ class B extends A {
 ''');
   }
 
-  void test_createConstructorSuperImplicit_fieldInitializer() {
+  test_createConstructorSuperImplicit_fieldInitializer() async {
     resolveTestUnit('''
 class A {
   int _field;
@@ -761,7 +1008,9 @@ class B extends A {
   void existingMethod() {}
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR_SUPER,
+        '''
 class A {
   int _field;
   A(this._field);
@@ -776,12 +1025,16 @@ class B extends A {
 ''');
   }
 
-  void test_createConstructorSuperImplicit_importType() {
-    addSource('/libA.dart', r'''
+  test_createConstructorSuperImplicit_importType() async {
+    addSource(
+        '/libA.dart',
+        r'''
 library libA;
 class A {}
 ''');
-    addSource('/libB.dart', r'''
+    addSource(
+        '/libB.dart',
+        r'''
 library libB;
 import 'libA.dart';
 class B {
@@ -793,7 +1046,9 @@ import 'libB.dart';
 class C extends B {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR_SUPER,
+        '''
 import 'libB.dart';
 import 'libA.dart';
 class C extends B {
@@ -802,7 +1057,7 @@ class C extends B {
 ''');
   }
 
-  void test_createConstructorSuperImplicit_named() {
+  test_createConstructorSuperImplicit_named() async {
     resolveTestUnit('''
 class A {
   A.named(p1, int p2);
@@ -813,7 +1068,9 @@ class B extends A {
   void existingMethod() {}
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR_SUPER,
+        '''
 class A {
   A.named(p1, int p2);
 }
@@ -827,7 +1084,7 @@ class B extends A {
 ''');
   }
 
-  void test_createConstructorSuperImplicit_private() {
+  test_createConstructorSuperImplicit_private() async {
     resolveTestUnit('''
 class A {
   A._named(p);
@@ -835,10 +1092,10 @@ class A {
 class B extends A {
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER);
+    await assertNoFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER);
   }
 
-  void test_createConstructorSuperImplicit_typeArgument() {
+  test_createConstructorSuperImplicit_typeArgument() async {
     resolveTestUnit('''
 class C<T> {
   final T x;
@@ -846,7 +1103,9 @@ class C<T> {
 }
 class D extends C<int> {
 }''');
-    assertHasFix(DartFixKind.CREATE_CONSTRUCTOR_SUPER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_CONSTRUCTOR_SUPER,
+        '''
 class C<T> {
   final T x;
   C(this.x);
@@ -856,7 +1115,7 @@ class D extends C<int> {
 }''');
   }
 
-  void test_createField_BAD_inEnum() {
+  test_createField_BAD_inEnum() async {
     resolveTestUnit('''
 enum MyEnum {
   AAA, BBB
@@ -865,19 +1124,19 @@ main() {
   MyEnum.foo;
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_FIELD);
+    await assertNoFix(DartFixKind.CREATE_FIELD);
   }
 
-  void test_createField_BAD_inSDK() {
+  test_createField_BAD_inSDK() async {
     resolveTestUnit('''
 main(List p) {
   p.foo = 1;
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_FIELD);
+    await assertNoFix(DartFixKind.CREATE_FIELD);
   }
 
-  void test_createField_getter_multiLevel() {
+  test_createField_getter_multiLevel() async {
     resolveTestUnit('''
 class A {
 }
@@ -891,7 +1150,9 @@ main(C c) {
   int v = c.b.a.test;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int test;
 }
@@ -907,7 +1168,7 @@ main(C c) {
 ''');
   }
 
-  void test_createField_getter_qualified_instance() {
+  test_createField_getter_qualified_instance() async {
     resolveTestUnit('''
 class A {
 }
@@ -915,7 +1176,9 @@ main(A a) {
   int v = a.test;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int test;
 }
@@ -925,7 +1188,7 @@ main(A a) {
 ''');
   }
 
-  void test_createField_getter_qualified_instance_dynamicType() {
+  test_createField_getter_qualified_instance_dynamicType() async {
     resolveTestUnit('''
 class A {
   B b;
@@ -936,7 +1199,9 @@ class A {
 class B {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   B b;
   void f(Object p) {
@@ -949,7 +1214,7 @@ class B {
 ''');
   }
 
-  void test_createField_getter_unqualified_instance_asInvocationArgument() {
+  test_createField_getter_unqualified_instance_asInvocationArgument() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -958,7 +1223,9 @@ class A {
 }
 f(String s) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   String test;
 
@@ -970,7 +1237,7 @@ f(String s) {}
 ''');
   }
 
-  void test_createField_getter_unqualified_instance_assignmentRhs() {
+  test_createField_getter_unqualified_instance_assignmentRhs() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -978,7 +1245,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int test;
 
@@ -989,7 +1258,7 @@ class A {
 ''');
   }
 
-  void test_createField_getter_unqualified_instance_asStatement() {
+  test_createField_getter_unqualified_instance_asStatement() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -997,7 +1266,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   var test;
 
@@ -1008,7 +1279,7 @@ class A {
 ''');
   }
 
-  void test_createField_hint() {
+  test_createField_hint() async {
     resolveTestUnit('''
 class A {
 }
@@ -1017,7 +1288,9 @@ main(A a) {
   int v = x.test;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int test;
 }
@@ -1028,7 +1301,7 @@ main(A a) {
 ''');
   }
 
-  void test_createField_hint_setter() {
+  test_createField_hint_setter() async {
     resolveTestUnit('''
 class A {
 }
@@ -1037,7 +1310,9 @@ main(A a) {
   x.test = 0;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int test;
 }
@@ -1048,12 +1323,16 @@ main(A a) {
 ''');
   }
 
-  void test_createField_importType() {
-    addSource('/libA.dart', r'''
+  test_createField_importType() async {
+    addSource(
+        '/libA.dart',
+        r'''
 library libA;
 class A {}
 ''');
-    addSource('/libB.dart', r'''
+    addSource(
+        '/libB.dart',
+        r'''
 library libB;
 import 'libA.dart';
 A getA() => null;
@@ -1066,7 +1345,9 @@ main(C c) {
   c.test = getA();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 import 'libB.dart';
 import 'libA.dart';
 class C {
@@ -1078,7 +1359,7 @@ main(C c) {
 ''');
   }
 
-  void test_createField_setter_generic_BAD() {
+  test_createField_setter_generic_BAD() async {
     resolveTestUnit('''
 class A {
 }
@@ -1089,7 +1370,9 @@ class B<T> {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   List test;
 }
@@ -1102,7 +1385,7 @@ class B<T> {
 ''');
   }
 
-  void test_createField_setter_generic_OK_local() {
+  test_createField_setter_generic_OK_local() async {
     resolveTestUnit('''
 class A<T> {
   List<T> items;
@@ -1112,7 +1395,9 @@ class A<T> {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A<T> {
   List<T> items;
 
@@ -1125,7 +1410,7 @@ class A<T> {
 ''');
   }
 
-  void test_createField_setter_qualified_instance_hasField() {
+  test_createField_setter_qualified_instance_hasField() async {
     resolveTestUnit('''
 class A {
   int aaa;
@@ -1137,7 +1422,9 @@ main(A a) {
   a.test = 5;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int aaa;
   int zzz;
@@ -1152,7 +1439,7 @@ main(A a) {
 ''');
   }
 
-  void test_createField_setter_qualified_instance_hasMethod() {
+  test_createField_setter_qualified_instance_hasMethod() async {
     resolveTestUnit('''
 class A {
   existingMethod() {}
@@ -1161,7 +1448,9 @@ main(A a) {
   a.test = 5;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int test;
 
@@ -1173,7 +1462,7 @@ main(A a) {
 ''');
   }
 
-  void test_createField_setter_qualified_static() {
+  test_createField_setter_qualified_static() async {
     resolveTestUnit('''
 class A {
 }
@@ -1181,7 +1470,9 @@ main() {
   A.test = 5;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   static int test;
 }
@@ -1191,7 +1482,7 @@ main() {
 ''');
   }
 
-  void test_createField_setter_unqualified_instance() {
+  test_createField_setter_unqualified_instance() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -1199,7 +1490,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   int test;
 
@@ -1210,7 +1503,7 @@ class A {
 ''');
   }
 
-  void test_createField_setter_unqualified_static() {
+  test_createField_setter_unqualified_static() async {
     resolveTestUnit('''
 class A {
   static main() {
@@ -1218,7 +1511,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FIELD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FIELD,
+        '''
 class A {
   static int test;
 
@@ -1229,13 +1524,13 @@ class A {
 ''');
   }
 
-  void test_createFile_forImport() {
+  test_createFile_forImport() async {
     testFile = '/my/project/bin/test.dart';
     resolveTestUnit('''
 import 'my_file.dart';
 ''');
     AnalysisError error = _findErrorToFix();
-    fix = _assertHasFix(DartFixKind.CREATE_FILE, error);
+    fix = await _assertHasFix(DartFixKind.CREATE_FILE, error);
     change = fix.change;
     // validate change
     List<SourceFileEdit> fileEdits = change.edits;
@@ -1244,17 +1539,75 @@ import 'my_file.dart';
     expect(fileEdit.file, '/my/project/bin/my_file.dart');
     expect(fileEdit.fileStamp, -1);
     expect(fileEdit.edits, hasLength(1));
-    expect(fileEdit.edits[0].replacement, contains('library my.file;'));
+    expect(fileEdit.edits[0].replacement, contains('library my_file;'));
   }
 
-  void test_createFile_forPart() {
+  test_createFile_forImport_BAD_inPackage_lib_justLib() async {
+    provider.newFile('/projects/my_package/pubspec.yaml', 'name: my_package');
+    testFile = '/projects/my_package/test.dart';
+    resolveTestUnit('''
+import 'lib';
+''');
+    await assertNoFix(DartFixKind.CREATE_FILE);
+  }
+
+  test_createFile_forImport_BAD_notDart() async {
+    testFile = '/my/project/bin/test.dart';
+    resolveTestUnit('''
+import 'my_file.txt';
+''');
+    await assertNoFix(DartFixKind.CREATE_FILE);
+  }
+
+  test_createFile_forImport_inPackage_lib() async {
+    provider.newFile('/projects/my_package/pubspec.yaml', 'name: my_package');
+    testFile = '/projects/my_package/lib/test.dart';
+    provider.newFolder('/projects/my_package/lib');
+    resolveTestUnit('''
+import 'a/bb/c_cc/my_lib.dart';
+''');
+    AnalysisError error = _findErrorToFix();
+    fix = await _assertHasFix(DartFixKind.CREATE_FILE, error);
+    change = fix.change;
+    // validate change
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/projects/my_package/lib/a/bb/c_cc/my_lib.dart');
+    expect(fileEdit.fileStamp, -1);
+    expect(fileEdit.edits, hasLength(1));
+    expect(fileEdit.edits[0].replacement,
+        contains('library my_package.a.bb.c_cc.my_lib;'));
+  }
+
+  test_createFile_forImport_inPackage_test() async {
+    provider.newFile('/projects/my_package/pubspec.yaml', 'name: my_package');
+    testFile = '/projects/my_package/test/misc/test_all.dart';
+    resolveTestUnit('''
+import 'a/bb/my_lib.dart';
+''');
+    AnalysisError error = _findErrorToFix();
+    fix = await _assertHasFix(DartFixKind.CREATE_FILE, error);
+    change = fix.change;
+    // validate change
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/projects/my_package/test/misc/a/bb/my_lib.dart');
+    expect(fileEdit.fileStamp, -1);
+    expect(fileEdit.edits, hasLength(1));
+    expect(fileEdit.edits[0].replacement,
+        contains('library my_package.test.misc.a.bb.my_lib;'));
+  }
+
+  test_createFile_forPart() async {
     testFile = '/my/project/bin/test.dart';
     resolveTestUnit('''
 library my.lib;
 part 'my_part.dart';
 ''');
     AnalysisError error = _findErrorToFix();
-    fix = _assertHasFix(DartFixKind.CREATE_FILE, error);
+    fix = await _assertHasFix(DartFixKind.CREATE_FILE, error);
     change = fix.change;
     // validate change
     List<SourceFileEdit> fileEdits = change.edits;
@@ -1266,24 +1619,29 @@ part 'my_part.dart';
     expect(fileEdit.edits[0].replacement, contains('part of my.lib;'));
   }
 
-  void test_createFile_forPart_inPackageLib() {
-    provider.newFile('/my/pubspec.yaml', r'''
+  test_createFile_forPart_inPackageLib() async {
+    provider.newFile(
+        '/my/pubspec.yaml',
+        r'''
 name: my_test
 ''');
     testFile = '/my/lib/test.dart';
-    addTestSource('''
+    addTestSource(
+        '''
 library my.lib;
 part 'my_part.dart';
-''', Uri.parse('package:my/test.dart'));
+''',
+        Uri.parse('package:my/test.dart'));
     // configure SourceFactory
-    UriResolver pkgResolver = new PackageMapUriResolver(
-        provider, {'my': [provider.getResource('/my/lib')],});
+    UriResolver pkgResolver = new PackageMapUriResolver(provider, {
+      'my': [provider.getResource('/my/lib')],
+    });
     context.sourceFactory = new SourceFactory(
         [AbstractContextTest.SDK_RESOLVER, pkgResolver, resourceResolver]);
     // prepare fix
     testUnit = resolveLibraryUnit(testSource);
     AnalysisError error = _findErrorToFix();
-    fix = _assertHasFix(DartFixKind.CREATE_FILE, error);
+    fix = await _assertHasFix(DartFixKind.CREATE_FILE, error);
     change = fix.change;
     // validate change
     List<SourceFileEdit> fileEdits = change.edits;
@@ -1295,16 +1653,16 @@ part 'my_part.dart';
     expect(fileEdit.edits[0].replacement, contains('part of my.lib;'));
   }
 
-  void test_createGetter_BAD_inSDK() {
+  test_createGetter_BAD_inSDK() async {
     resolveTestUnit('''
 main(List p) {
   int v = p.foo;
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_GETTER);
+    await assertNoFix(DartFixKind.CREATE_GETTER);
   }
 
-  void test_createGetter_hint_getter() {
+  test_createGetter_hint_getter() async {
     resolveTestUnit('''
 class A {
 }
@@ -1313,7 +1671,9 @@ main(A a) {
   int v = x.test;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
 class A {
   int get test => null;
 }
@@ -1324,7 +1684,38 @@ main(A a) {
 ''');
   }
 
-  void test_createGetter_multiLevel() {
+  test_createGetter_location_afterLastGetter() async {
+    resolveTestUnit('''
+class A {
+  int existingField;
+
+  int get existingGetter => null;
+
+  existingMethod() {}
+}
+main(A a) {
+  int v = a.test;
+}
+''');
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
+class A {
+  int existingField;
+
+  int get existingGetter => null;
+
+  int get test => null;
+
+  existingMethod() {}
+}
+main(A a) {
+  int v = a.test;
+}
+''');
+  }
+
+  test_createGetter_multiLevel() async {
     resolveTestUnit('''
 class A {
 }
@@ -1338,7 +1729,9 @@ main(C c) {
   int v = c.b.a.test;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
 class A {
   int get test => null;
 }
@@ -1354,7 +1747,7 @@ main(C c) {
 ''');
   }
 
-  void test_createGetter_qualified_instance() {
+  test_createGetter_qualified_instance() async {
     resolveTestUnit('''
 class A {
 }
@@ -1362,7 +1755,9 @@ main(A a) {
   int v = a.test;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
 class A {
   int get test => null;
 }
@@ -1372,7 +1767,7 @@ main(A a) {
 ''');
   }
 
-  void test_createGetter_qualified_instance_dynamicType() {
+  test_createGetter_qualified_instance_dynamicType() async {
     resolveTestUnit('''
 class A {
   B b;
@@ -1383,7 +1778,9 @@ class A {
 class B {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
 class A {
   B b;
   void f(Object p) {
@@ -1396,7 +1793,7 @@ class B {
 ''');
   }
 
-  void test_createGetter_setterContext() {
+  test_createGetter_setterContext() async {
     resolveTestUnit('''
 class A {
 }
@@ -1404,10 +1801,10 @@ main(A a) {
   a.test = 42;
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_GETTER);
+    await assertNoFix(DartFixKind.CREATE_GETTER);
   }
 
-  void test_createGetter_unqualified_instance_asInvocationArgument() {
+  test_createGetter_unqualified_instance_asInvocationArgument() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -1416,7 +1813,9 @@ class A {
 }
 f(String s) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
 class A {
   String get test => null;
 
@@ -1428,7 +1827,7 @@ f(String s) {}
 ''');
   }
 
-  void test_createGetter_unqualified_instance_assignmentLhs() {
+  test_createGetter_unqualified_instance_assignmentLhs() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -1436,10 +1835,10 @@ class A {
   }
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_GETTER);
+    await assertNoFix(DartFixKind.CREATE_GETTER);
   }
 
-  void test_createGetter_unqualified_instance_assignmentRhs() {
+  test_createGetter_unqualified_instance_assignmentRhs() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -1447,7 +1846,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
 class A {
   int get test => null;
 
@@ -1458,7 +1859,7 @@ class A {
 ''');
   }
 
-  void test_createGetter_unqualified_instance_asStatement() {
+  test_createGetter_unqualified_instance_asStatement() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -1466,7 +1867,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
+    await assertHasFix(
+        DartFixKind.CREATE_GETTER,
+        '''
 class A {
   get test => null;
 
@@ -1477,7 +1880,7 @@ class A {
 ''');
   }
 
-  void test_createLocalVariable_functionType_named() {
+  test_createLocalVariable_functionType_named() async {
     resolveTestUnit('''
 typedef MY_FUNCTION(int p);
 foo(MY_FUNCTION f) {}
@@ -1485,7 +1888,9 @@ main() {
   foo(bar);
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+    await assertHasFix(
+        DartFixKind.CREATE_LOCAL_VARIABLE,
+        '''
 typedef MY_FUNCTION(int p);
 foo(MY_FUNCTION f) {}
 main() {
@@ -1495,23 +1900,25 @@ main() {
 ''');
   }
 
-  void test_createLocalVariable_functionType_synthetic() {
+  test_createLocalVariable_functionType_synthetic() async {
     resolveTestUnit('''
 foo(f(int p)) {}
 main() {
   foo(bar);
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_LOCAL_VARIABLE);
+    await assertNoFix(DartFixKind.CREATE_LOCAL_VARIABLE);
   }
 
-  void test_createLocalVariable_read_typeAssignment() {
+  test_createLocalVariable_read_typeAssignment() async {
     resolveTestUnit('''
 main() {
   int a = test;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+    await assertHasFix(
+        DartFixKind.CREATE_LOCAL_VARIABLE,
+        '''
 main() {
   int test;
   int a = test;
@@ -1519,7 +1926,7 @@ main() {
 ''');
   }
 
-  void test_createLocalVariable_read_typeCondition() {
+  test_createLocalVariable_read_typeCondition() async {
     resolveTestUnit('''
 main() {
   if (!test) {
@@ -1527,7 +1934,9 @@ main() {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+    await assertHasFix(
+        DartFixKind.CREATE_LOCAL_VARIABLE,
+        '''
 main() {
   bool test;
   if (!test) {
@@ -1537,14 +1946,16 @@ main() {
 ''');
   }
 
-  void test_createLocalVariable_read_typeInvocationArgument() {
+  test_createLocalVariable_read_typeInvocationArgument() async {
     resolveTestUnit('''
 main() {
   f(test);
 }
 f(String p) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+    await assertHasFix(
+        DartFixKind.CREATE_LOCAL_VARIABLE,
+        '''
 main() {
   String test;
   f(test);
@@ -1555,13 +1966,15 @@ f(String p) {}
     _assertLinkedGroup(change.linkedEditGroups[1], ['test;', 'test);']);
   }
 
-  void test_createLocalVariable_read_typeInvocationTarget() {
+  test_createLocalVariable_read_typeInvocationTarget() async {
     resolveTestUnit('''
 main() {
   test.add('hello');
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+    await assertHasFix(
+        DartFixKind.CREATE_LOCAL_VARIABLE,
+        '''
 main() {
   var test;
   test.add('hello');
@@ -1570,26 +1983,30 @@ main() {
     _assertLinkedGroup(change.linkedEditGroups[0], ['test;', 'test.add(']);
   }
 
-  void test_createLocalVariable_write_assignment() {
+  test_createLocalVariable_write_assignment() async {
     resolveTestUnit('''
 main() {
   test = 42;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+    await assertHasFix(
+        DartFixKind.CREATE_LOCAL_VARIABLE,
+        '''
 main() {
   var test = 42;
 }
 ''');
   }
 
-  void test_createLocalVariable_write_assignment_compound() {
+  test_createLocalVariable_write_assignment_compound() async {
     resolveTestUnit('''
 main() {
   test += 42;
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_LOCAL_VARIABLE, '''
+    await assertHasFix(
+        DartFixKind.CREATE_LOCAL_VARIABLE,
+        '''
 main() {
   int test;
   test += 42;
@@ -1597,7 +2014,7 @@ main() {
 ''');
   }
 
-  void test_createMissingOverrides_functionTypeAlias() {
+  test_createMissingOverrides_functionTypeAlias() async {
     resolveTestUnit('''
 typedef int Binary(int left, int right);
 
@@ -1608,7 +2025,9 @@ abstract class Emulator {
 class MyEmulator extends Emulator {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 typedef int Binary(int left, int right);
 
 abstract class Emulator {
@@ -1624,7 +2043,7 @@ class MyEmulator extends Emulator {
 ''');
   }
 
-  void test_createMissingOverrides_functionTypedParameter() {
+  test_createMissingOverrides_functionTypedParameter() async {
     resolveTestUnit('''
 abstract class A {
   forEach(int f(double p1, String p2));
@@ -1633,7 +2052,9 @@ abstract class A {
 class B extends A {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 abstract class A {
   forEach(int f(double p1, String p2));
 }
@@ -1647,7 +2068,7 @@ class B extends A {
 ''');
   }
 
-  void test_createMissingOverrides_generics_typeArguments() {
+  test_createMissingOverrides_generics_typeArguments() async {
     resolveTestUnit('''
 class Iterator<T> {
 }
@@ -1659,7 +2080,9 @@ abstract class IterableMixin<T> {
 class Test extends IterableMixin<int> {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 class Iterator<T> {
 }
 
@@ -1675,7 +2098,7 @@ class Test extends IterableMixin<int> {
 ''');
   }
 
-  void test_createMissingOverrides_generics_typeParameters() {
+  test_createMissingOverrides_generics_typeParameters() async {
     resolveTestUnit('''
 abstract class ItemProvider<T> {
   List<T> getItems();
@@ -1684,7 +2107,9 @@ abstract class ItemProvider<T> {
 class Test<V> extends ItemProvider<V> {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 abstract class ItemProvider<T> {
   List<T> getItems();
 }
@@ -1698,7 +2123,7 @@ class Test<V> extends ItemProvider<V> {
 ''');
   }
 
-  void test_createMissingOverrides_getter() {
+  test_createMissingOverrides_getter() async {
     resolveTestUnit('''
 abstract class A {
   get g1;
@@ -1708,7 +2133,9 @@ abstract class A {
 class B extends A {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 abstract class A {
   get g1;
   int get g2;
@@ -1726,7 +2153,7 @@ class B extends A {
 ''');
   }
 
-  void test_createMissingOverrides_importPrefix() {
+  test_createMissingOverrides_importPrefix() async {
     resolveTestUnit('''
 import 'dart:async' as aaa;
 abstract class A {
@@ -1736,7 +2163,9 @@ abstract class A {
 class B extends A {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 import 'dart:async' as aaa;
 abstract class A {
   Map<aaa.Future, List<aaa.Future>> g(aaa.Future p);
@@ -1751,7 +2180,7 @@ class B extends A {
 ''');
   }
 
-  void test_createMissingOverrides_mergeToField_getterSetter() {
+  test_createMissingOverrides_mergeToField_getterSetter() async {
     resolveTestUnit('''
 class A {
   int ma;
@@ -1762,7 +2191,9 @@ class A {
 class B implements A {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 class A {
   int ma;
   void mb() {}
@@ -1782,7 +2213,7 @@ class B implements A {
 ''');
   }
 
-  void test_createMissingOverrides_method() {
+  test_createMissingOverrides_method() async {
     resolveTestUnit('''
 abstract class A {
   m1();
@@ -1838,7 +2269,7 @@ class B extends A {
   }
 }
 ''';
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, expectedCode);
+    await assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, expectedCode);
     // end position should be on "m1", not on "m2", "m3", etc
     {
       Position endPosition = change.selection;
@@ -1855,7 +2286,7 @@ class B extends A {
     }
   }
 
-  void test_createMissingOverrides_operator() {
+  test_createMissingOverrides_operator() async {
     resolveTestUnit('''
 abstract class A {
   int operator [](int index);
@@ -1865,7 +2296,9 @@ abstract class A {
 class B extends A {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 abstract class A {
   int operator [](int index);
   void operator []=(int index, String value);
@@ -1885,7 +2318,7 @@ class B extends A {
 ''');
   }
 
-  void test_createMissingOverrides_setter() {
+  test_createMissingOverrides_setter() async {
     resolveTestUnit('''
 abstract class A {
   set s1(x);
@@ -1896,7 +2329,9 @@ abstract class A {
 class B extends A {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_MISSING_OVERRIDES, '''
+    await assertHasFix(
+        DartFixKind.CREATE_MISSING_OVERRIDES,
+        '''
 abstract class A {
   set s1(x);
   set s2(int x);
@@ -1922,7 +2357,7 @@ class B extends A {
 ''');
   }
 
-  void test_createNoSuchMethod() {
+  test_createNoSuchMethod() async {
     resolveTestUnit('''
 abstract class A {
   m1();
@@ -1933,7 +2368,9 @@ class B extends A {
   existing() {}
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_NO_SUCH_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_NO_SUCH_METHOD,
+        '''
 abstract class A {
   m1();
   int m2();
@@ -1947,36 +2384,7 @@ class B extends A {
 ''');
   }
 
-  void test_creatGetter_location_afterLastGetter() {
-    resolveTestUnit('''
-class A {
-  int existingField;
-
-  int get existingGetter => null;
-
-  existingMethod() {}
-}
-main(A a) {
-  int v = a.test;
-}
-''');
-    assertHasFix(DartFixKind.CREATE_GETTER, '''
-class A {
-  int existingField;
-
-  int get existingGetter => null;
-
-  int get test => null;
-
-  existingMethod() {}
-}
-main(A a) {
-  int v = a.test;
-}
-''');
-  }
-
-  void test_creationFunction_forFunctionType_cascadeSecond() {
+  test_creationFunction_forFunctionType_cascadeSecond() async {
     resolveTestUnit('''
 class A {
   B ma() => null;
@@ -1990,7 +2398,9 @@ main() {
   a..ma().useFunction(test);
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 class A {
   B ma() => null;
 }
@@ -2008,14 +2418,16 @@ int test(double a, String b) {
 ''');
   }
 
-  void test_creationFunction_forFunctionType_coreFunction() {
+  test_creationFunction_forFunctionType_coreFunction() async {
     resolveTestUnit('''
 main() {
   useFunction(g: test);
 }
 useFunction({Function g}) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   useFunction(g: test);
 }
@@ -2026,14 +2438,16 @@ test() {
 ''');
   }
 
-  void test_creationFunction_forFunctionType_dynamicArgument() {
+  test_creationFunction_forFunctionType_dynamicArgument() async {
     resolveTestUnit('''
 main() {
   useFunction(test);
 }
 useFunction(int g(a, b)) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   useFunction(test);
 }
@@ -2044,14 +2458,16 @@ int test(a, b) {
 ''');
   }
 
-  void test_creationFunction_forFunctionType_function() {
+  test_creationFunction_forFunctionType_function() async {
     resolveTestUnit('''
 main() {
   useFunction(test);
 }
 useFunction(int g(double a, String b)) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   useFunction(test);
 }
@@ -2062,14 +2478,16 @@ int test(double a, String b) {
 ''');
   }
 
-  void test_creationFunction_forFunctionType_function_namedArgument() {
+  test_creationFunction_forFunctionType_function_namedArgument() async {
     resolveTestUnit('''
 main() {
   useFunction(g: test);
 }
 useFunction({int g(double a, String b)}) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   useFunction(g: test);
 }
@@ -2080,12 +2498,16 @@ int test(double a, String b) {
 ''');
   }
 
-  void test_creationFunction_forFunctionType_importType() {
-    addSource('/libA.dart', r'''
+  test_creationFunction_forFunctionType_importType() async {
+    addSource(
+        '/libA.dart',
+        r'''
 library libA;
 class A {}
 ''');
-    addSource('/libB.dart', r'''
+    addSource(
+        '/libB.dart',
+        r'''
 library libB;
 import 'libA.dart';
 useFunction(int g(A a)) {}
@@ -2096,7 +2518,9 @@ main() {
   useFunction(test);
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 import 'libB.dart';
 import 'libA.dart';
 main() {
@@ -2108,7 +2532,7 @@ int test(A a) {
 ''');
   }
 
-  void test_creationFunction_forFunctionType_method_enclosingClass_static() {
+  test_creationFunction_forFunctionType_method_enclosingClass_static() async {
     resolveTestUnit('''
 class A {
   static foo() {
@@ -2117,7 +2541,9 @@ class A {
 }
 useFunction(int g(double a, String b)) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   static foo() {
     useFunction(test);
@@ -2130,7 +2556,7 @@ useFunction(int g(double a, String b)) {}
 ''');
   }
 
-  void test_creationFunction_forFunctionType_method_enclosingClass_static2() {
+  test_creationFunction_forFunctionType_method_enclosingClass_static2() async {
     resolveTestUnit('''
 class A {
   var f;
@@ -2138,7 +2564,9 @@ class A {
 }
 useFunction(int g(double a, String b)) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   var f;
   A() : f = useFunction(test);
@@ -2150,7 +2578,7 @@ useFunction(int g(double a, String b)) {}
 ''');
   }
 
-  void test_creationFunction_forFunctionType_method_targetClass() {
+  test_creationFunction_forFunctionType_method_targetClass() async {
     resolveTestUnit('''
 main(A a) {
   useFunction(a.test);
@@ -2159,7 +2587,9 @@ class A {
 }
 useFunction(int g(double a, String b)) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 main(A a) {
   useFunction(a.test);
 }
@@ -2171,7 +2601,7 @@ useFunction(int g(double a, String b)) {}
 ''');
   }
 
-  void test_creationFunction_forFunctionType_method_targetClass_hasOtherMember() {
+  test_creationFunction_forFunctionType_method_targetClass_hasOtherMember() async {
     resolveTestUnit('''
 main(A a) {
   useFunction(a.test);
@@ -2181,7 +2611,9 @@ class A {
 }
 useFunction(int g(double a, String b)) {}
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 main(A a) {
   useFunction(a.test);
 }
@@ -2195,7 +2627,7 @@ useFunction(int g(double a, String b)) {}
 ''');
   }
 
-  void test_creationFunction_forFunctionType_notFunctionType() {
+  test_creationFunction_forFunctionType_notFunctionType() async {
     resolveTestUnit('''
 main(A a) {
   useFunction(a.test);
@@ -2203,11 +2635,11 @@ main(A a) {
 typedef A();
 useFunction(g) {}
 ''');
-    assertNoFix(DartFixKind.CREATE_METHOD);
-    assertNoFix(DartFixKind.CREATE_FUNCTION);
+    await assertNoFix(DartFixKind.CREATE_METHOD);
+    await assertNoFix(DartFixKind.CREATE_FUNCTION);
   }
 
-  void test_creationFunction_forFunctionType_unknownTarget() {
+  test_creationFunction_forFunctionType_unknownTarget() async {
     resolveTestUnit('''
 main(A a) {
   useFunction(a.test);
@@ -2216,23 +2648,41 @@ class A {
 }
 useFunction(g) {}
 ''');
-    assertNoFix(DartFixKind.CREATE_METHOD);
+    await assertNoFix(DartFixKind.CREATE_METHOD);
   }
 
-  void test_expectedToken_semicolon() {
+  test_expectedToken_semicolon() async {
     resolveTestUnit('''
 main() {
   print(0)
 }
 ''');
-    assertHasFix(DartFixKind.INSERT_SEMICOLON, '''
+    await assertHasFix(
+        DartFixKind.INSERT_SEMICOLON,
+        '''
 main() {
   print(0);
 }
 ''');
   }
 
-  void test_illegalAsyncReturnType_asyncLibrary_import() {
+  test_illegalAsyncReturnType_adjacentNodes() async {
+    errorFilter = (AnalysisError error) {
+      return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
+    };
+    resolveTestUnit('''
+import 'dart:async';
+var v;int main() async => 0;
+''');
+    await assertHasFix(
+        DartFixKind.REPLACE_RETURN_TYPE_FUTURE,
+        '''
+import 'dart:async';
+var v;Future<int> main() async => 0;
+''');
+  }
+
+  test_illegalAsyncReturnType_asyncLibrary_import() async {
     errorFilter = (AnalysisError error) {
       return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
     };
@@ -2241,7 +2691,9 @@ library main;
 int main() async {
 }
 ''');
-    assertHasFix(DartFixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_RETURN_TYPE_FUTURE,
+        '''
 library main;
 import 'dart:async';
 Future<int> main() async {
@@ -2249,7 +2701,7 @@ Future<int> main() async {
 ''');
   }
 
-  void test_illegalAsyncReturnType_asyncLibrary_usePrefix() {
+  test_illegalAsyncReturnType_asyncLibrary_usePrefix() async {
     errorFilter = (AnalysisError error) {
       return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
     };
@@ -2258,14 +2710,16 @@ import 'dart:async' as al;
 int main() async {
 }
 ''');
-    assertHasFix(DartFixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_RETURN_TYPE_FUTURE,
+        '''
 import 'dart:async' as al;
 al.Future<int> main() async {
 }
 ''');
   }
 
-  void test_illegalAsyncReturnType_complexTypeName() {
+  test_illegalAsyncReturnType_complexTypeName() async {
     errorFilter = (AnalysisError error) {
       return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
     };
@@ -2274,14 +2728,16 @@ import 'dart:async';
 List<int> main() async {
 }
 ''');
-    assertHasFix(DartFixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_RETURN_TYPE_FUTURE,
+        '''
 import 'dart:async';
 Future<List<int>> main() async {
 }
 ''');
   }
 
-  void test_illegalAsyncReturnType_void() {
+  test_illegalAsyncReturnType_void() async {
     errorFilter = (AnalysisError error) {
       return error.errorCode == StaticTypeWarningCode.ILLEGAL_ASYNC_RETURN_TYPE;
     };
@@ -2290,14 +2746,16 @@ import 'dart:async';
 void main() async {
 }
 ''');
-    assertHasFix(DartFixKind.REPLACE_RETURN_TYPE_FUTURE, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_RETURN_TYPE_FUTURE,
+        '''
 import 'dart:async';
 Future main() async {
 }
 ''');
   }
 
-  void test_importLibraryPackage_withClass() {
+  test_importLibraryPackage_withClass() async {
     _configureMyPkg('''
 library my_lib;
 class Test {}
@@ -2309,7 +2767,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import 'package:my_pkg/my_lib.dart';
 
 main() {
@@ -2318,42 +2778,10 @@ main() {
 ''');
   }
 
-  void test_importLibraryPrefix_withClass() {
-    resolveTestUnit('''
-import 'dart:async' as pref;
-main() {
-  pref.Stream s = null;
-  Future f = null;
-}
-''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PREFIX, '''
-import 'dart:async' as pref;
-main() {
-  pref.Stream s = null;
-  pref.Future f = null;
-}
-''');
-  }
-
-  void test_importLibraryPrefix_withTopLevelVariable() {
-    resolveTestUnit('''
-import 'dart:math' as pref;
-main() {
-  print(pref.E);
-  print(PI);
-}
-''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PREFIX, '''
-import 'dart:math' as pref;
-main() {
-  print(pref.E);
-  print(pref.PI);
-}
-''');
-  }
-
-  void test_importLibraryProject_withClass_annotation() {
-    addSource('/lib.dart', '''
+  test_importLibraryProject_withClass_annotation() async {
+    addSource(
+        '/lib.dart',
+        '''
 library lib;
 class Test {
   const Test(int p);
@@ -2365,7 +2793,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import 'lib.dart';
 
 @Test(0)
@@ -2374,9 +2804,46 @@ main() {
 ''');
   }
 
-  void test_importLibraryProject_withClass_inParentFolder() {
+  test_importLibraryProject_withClass_hasOtherLibraryWithPrefix() async {
     testFile = '/project/bin/test.dart';
-    addSource('/project/lib.dart', '''
+    addSource(
+        '/project/bin/a.dart',
+        '''
+library a;
+class One {}
+''');
+    addSource(
+        '/project/bin/b.dart',
+        '''
+library b;
+class One {}
+class Two {}
+''');
+    resolveTestUnit('''
+import 'b.dart' show Two;
+main () {
+  new Two();
+  new One();
+}
+''');
+    performAllAnalysisTasks();
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
+import 'b.dart' show Two;
+import 'a.dart';
+main () {
+  new Two();
+  new One();
+}
+''');
+  }
+
+  test_importLibraryProject_withClass_inParentFolder() async {
+    testFile = '/project/bin/test.dart';
+    addSource(
+        '/project/lib.dart',
+        '''
 library lib;
 class Test {}
 ''');
@@ -2386,7 +2853,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import '../lib.dart';
 
 main() {
@@ -2395,9 +2864,11 @@ main() {
 ''');
   }
 
-  void test_importLibraryProject_withClass_inRelativeFolder() {
+  test_importLibraryProject_withClass_inRelativeFolder() async {
     testFile = '/project/bin/test.dart';
-    addSource('/project/lib/sub/folder/lib.dart', '''
+    addSource(
+        '/project/lib/sub/folder/lib.dart',
+        '''
 library lib;
 class Test {}
 ''');
@@ -2407,7 +2878,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import '../lib/sub/folder/lib.dart';
 
 main() {
@@ -2416,9 +2889,11 @@ main() {
 ''');
   }
 
-  void test_importLibraryProject_withClass_inSameFolder() {
+  test_importLibraryProject_withClass_inSameFolder() async {
     testFile = '/project/bin/test.dart';
-    addSource('/project/bin/lib.dart', '''
+    addSource(
+        '/project/bin/lib.dart',
+        '''
 library lib;
 class Test {}
 ''');
@@ -2428,7 +2903,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import 'lib.dart';
 
 main() {
@@ -2437,8 +2914,10 @@ main() {
 ''');
   }
 
-  void test_importLibraryProject_withFunction() {
-    addSource('/lib.dart', '''
+  test_importLibraryProject_withFunction() async {
+    addSource(
+        '/lib.dart',
+        '''
 library lib;
 myFunction() {}
 ''');
@@ -2448,7 +2927,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import 'lib.dart';
 
 main() {
@@ -2457,8 +2938,10 @@ main() {
 ''');
   }
 
-  void test_importLibraryProject_withFunction_unresolvedMethod() {
-    addSource('/lib.dart', '''
+  test_importLibraryProject_withFunction_unresolvedMethod() async {
+    addSource(
+        '/lib.dart',
+        '''
 library lib;
 myFunction() {}
 ''');
@@ -2470,7 +2953,9 @@ class A {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import 'lib.dart';
 
 class A {
@@ -2481,9 +2966,11 @@ class A {
 ''');
   }
 
-  void test_importLibraryProject_withFunctionTypeAlias() {
+  test_importLibraryProject_withFunctionTypeAlias() async {
     testFile = '/project/bin/test.dart';
-    addSource('/project/bin/lib.dart', '''
+    addSource(
+        '/project/bin/lib.dart',
+        '''
 library lib;
 typedef MyFunction();
 ''');
@@ -2493,7 +2980,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import 'lib.dart';
 
 main() {
@@ -2502,8 +2991,10 @@ main() {
 ''');
   }
 
-  void test_importLibraryProject_withTopLevelVariable() {
-    addSource('/lib.dart', '''
+  test_importLibraryProject_withTopLevelVariable() async {
+    addSource(
+        '/lib.dart',
+        '''
 library lib;
 int MY_VAR = 42;
 ''');
@@ -2513,7 +3004,9 @@ main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_PROJECT, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PROJECT,
+        '''
 import 'lib.dart';
 
 main() {
@@ -2522,13 +3015,15 @@ main() {
 ''');
   }
 
-  void test_importLibrarySdk_withClass_AsExpression() {
+  test_importLibrarySdk_withClass_AsExpression() async {
     resolveTestUnit('''
 main(p) {
   p as Future;
 }
 ''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:async';
 
 main(p) {
@@ -2537,13 +3032,15 @@ main(p) {
 ''');
   }
 
-  void test_importLibrarySdk_withClass_invocationTarget() {
+  test_importLibrarySdk_withClass_invocationTarget() async {
     resolveTestUnit('''
 main() {
   Future.wait(null);
 }
 ''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:async';
 
 main() {
@@ -2552,13 +3049,15 @@ main() {
 ''');
   }
 
-  void test_importLibrarySdk_withClass_IsExpression() {
+  test_importLibrarySdk_withClass_IsExpression() async {
     resolveTestUnit('''
 main(p) {
   p is Future;
 }
 ''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:async';
 
 main(p) {
@@ -2567,13 +3066,57 @@ main(p) {
 ''');
   }
 
-  void test_importLibrarySdk_withClass_typeAnnotation() {
+  test_importLibrarySdk_withClass_itemOfList() async {
+    resolveTestUnit('''
+main() {
+  var a = [Future];
+}
+''');
+    performAllAnalysisTasks();
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
+import 'dart:async';
+
+main() {
+  var a = [Future];
+}
+''');
+  }
+
+  test_importLibrarySdk_withClass_itemOfList_inAnnotation() async {
+    errorFilter = (AnalysisError error) {
+      return error.errorCode == StaticWarningCode.UNDEFINED_IDENTIFIER;
+    };
+    resolveTestUnit('''
+class MyAnnotation {
+  const MyAnnotation(a, b);
+}
+@MyAnnotation(int, const [Future])
+main() {}
+''');
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
+import 'dart:async';
+
+class MyAnnotation {
+  const MyAnnotation(a, b);
+}
+@MyAnnotation(int, const [Future])
+main() {}
+''');
+  }
+
+  test_importLibrarySdk_withClass_typeAnnotation() async {
     resolveTestUnit('''
 main() {
   Future f = null;
 }
 ''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:async';
 
 main() {
@@ -2582,13 +3125,15 @@ main() {
 ''');
   }
 
-  void test_importLibrarySdk_withClass_typeAnnotation_PrefixedIdentifier() {
+  test_importLibrarySdk_withClass_typeAnnotation_PrefixedIdentifier() async {
     resolveTestUnit('''
 main() {
   Future.wait;
 }
 ''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:async';
 
 main() {
@@ -2597,13 +3142,15 @@ main() {
 ''');
   }
 
-  void test_importLibrarySdk_withClass_typeArgument() {
+  test_importLibrarySdk_withClass_typeArgument() async {
     resolveTestUnit('''
 main() {
   List<Future> futures = [];
 }
 ''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:async';
 
 main() {
@@ -2612,14 +3159,16 @@ main() {
 ''');
   }
 
-  void test_importLibrarySdk_withTopLevelVariable() {
+  test_importLibrarySdk_withTopLevelVariable() async {
     resolveTestUnit('''
 main() {
   print(PI);
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:math';
 
 main() {
@@ -2628,14 +3177,16 @@ main() {
 ''');
   }
 
-  void test_importLibrarySdk_withTopLevelVariable_annotation() {
+  test_importLibrarySdk_withTopLevelVariable_annotation() async {
     resolveTestUnit('''
 @PI
 main() {
 }
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SDK, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SDK,
+        '''
 import 'dart:math';
 
 @PI
@@ -2644,7 +3195,7 @@ main() {
 ''');
   }
 
-  void test_importLibraryShow() {
+  test_importLibraryShow() async {
     resolveTestUnit('''
 import 'dart:async' show Stream;
 main() {
@@ -2652,7 +3203,9 @@ main() {
   Future f = null;
 }
 ''');
-    assertHasFix(DartFixKind.IMPORT_LIBRARY_SHOW, '''
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_SHOW,
+        '''
 import 'dart:async' show Future, Stream;
 main() {
   Stream s = null;
@@ -2661,46 +3214,52 @@ main() {
 ''');
   }
 
-  void test_isNotNull() {
+  test_isNotNull() async {
     resolveTestUnit('''
 main(p) {
   p is! Null;
 }
 ''');
-    assertHasFix(DartFixKind.USE_NOT_EQ_NULL, '''
+    await assertHasFix(
+        DartFixKind.USE_NOT_EQ_NULL,
+        '''
 main(p) {
   p != null;
 }
 ''');
   }
 
-  void test_isNull() {
+  test_isNull() async {
     resolveTestUnit('''
 main(p) {
   p is Null;
 }
 ''');
-    assertHasFix(DartFixKind.USE_EQ_EQ_NULL, '''
+    await assertHasFix(
+        DartFixKind.USE_EQ_EQ_NULL,
+        '''
 main(p) {
   p == null;
 }
 ''');
   }
 
-  void test_makeEnclosingClassAbstract_declaresAbstractMethod() {
+  test_makeEnclosingClassAbstract_declaresAbstractMethod() async {
     resolveTestUnit('''
 class A {
   m();
 }
 ''');
-    assertHasFix(DartFixKind.MAKE_CLASS_ABSTRACT, '''
+    await assertHasFix(
+        DartFixKind.MAKE_CLASS_ABSTRACT,
+        '''
 abstract class A {
   m();
 }
 ''');
   }
 
-  void test_makeEnclosingClassAbstract_inheritsAbstractMethod() {
+  test_makeEnclosingClassAbstract_inheritsAbstractMethod() async {
     resolveTestUnit('''
 abstract class A {
   m();
@@ -2708,7 +3267,9 @@ abstract class A {
 class B extends A {
 }
 ''');
-    assertHasFix(DartFixKind.MAKE_CLASS_ABSTRACT, '''
+    await assertHasFix(
+        DartFixKind.MAKE_CLASS_ABSTRACT,
+        '''
 abstract class A {
   m();
 }
@@ -2717,18 +3278,79 @@ abstract class B extends A {
 ''');
   }
 
-  void test_noException_1() {
+  test_makeFieldNotFinal_hasType() async {
+    resolveTestUnit('''
+class A {
+  final int fff = 1;
+  main() {
+    fff = 2;
+  }
+}
+''');
+    await assertHasFix(
+        DartFixKind.MAKE_FIELD_NOT_FINAL,
+        '''
+class A {
+  int fff = 1;
+  main() {
+    fff = 2;
+  }
+}
+''');
+  }
+
+  test_makeFieldNotFinal_noType() async {
+    resolveTestUnit('''
+class A {
+  final fff = 1;
+  main() {
+    fff = 2;
+  }
+}
+''');
+    await assertHasFix(
+        DartFixKind.MAKE_FIELD_NOT_FINAL,
+        '''
+class A {
+  var fff = 1;
+  main() {
+    fff = 2;
+  }
+}
+''');
+  }
+
+  test_noException_1() async {
     resolveTestUnit('''
 main(p) {
   p i s Null;
 }''');
     List<AnalysisError> errors = context.computeErrors(testSource);
     for (var error in errors) {
-      _computeFixes(error);
+      await _computeFixes(error);
     }
   }
 
-  void test_removeDeadCode_condition() {
+  test_nonBoolCondition_addNotNull() async {
+    resolveTestUnit('''
+main(String p) {
+  if (p) {
+    print(p);
+  }
+}
+''');
+    await assertHasFix(
+        DartFixKind.ADD_NE_NULL,
+        '''
+main(String p) {
+  if (p != null) {
+    print(p);
+  }
+}
+''');
+  }
+
+  test_removeDeadCode_condition() async {
     resolveTestUnit('''
 main(int p) {
   if (true || p > 5) {
@@ -2736,7 +3358,9 @@ main(int p) {
   }
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_DEAD_CODE, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_DEAD_CODE,
+        '''
 main(int p) {
   if (true) {
     print(1);
@@ -2745,7 +3369,7 @@ main(int p) {
 ''');
   }
 
-  void test_removeDeadCode_statements_one() {
+  test_removeDeadCode_statements_one() async {
     resolveTestUnit('''
 int main() {
   print(0);
@@ -2753,7 +3377,9 @@ int main() {
   print(1);
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_DEAD_CODE, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_DEAD_CODE,
+        '''
 int main() {
   print(0);
   return 42;
@@ -2761,7 +3387,7 @@ int main() {
 ''');
   }
 
-  void test_removeDeadCode_statements_two() {
+  test_removeDeadCode_statements_two() async {
     resolveTestUnit('''
 int main() {
   print(0);
@@ -2770,7 +3396,9 @@ int main() {
   print(2);
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_DEAD_CODE, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_DEAD_CODE,
+        '''
 int main() {
   print(0);
   return 42;
@@ -2778,20 +3406,22 @@ int main() {
 ''');
   }
 
-  void test_removeParentheses_inGetterDeclaration() {
+  test_removeParentheses_inGetterDeclaration() async {
     resolveTestUnit('''
 class A {
   int get foo() => 0;
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_PARAMETERS_IN_GETTER_DECLARATION, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_PARAMETERS_IN_GETTER_DECLARATION,
+        '''
 class A {
   int get foo => 0;
 }
 ''');
   }
 
-  void test_removeParentheses_inGetterInvocation() {
+  test_removeParentheses_inGetterInvocation() async {
     resolveTestUnit('''
 class A {
   int get foo => 0;
@@ -2800,7 +3430,9 @@ main(A a) {
   a.foo();
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_PARENTHESIS_IN_GETTER_INVOCATION, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_PARENTHESIS_IN_GETTER_INVOCATION,
+        '''
 class A {
   int get foo => 0;
 }
@@ -2810,7 +3442,7 @@ main(A a) {
 ''');
   }
 
-  void test_removeUnnecessaryCast_assignment() {
+  test_removeUnnecessaryCast_assignment() async {
     resolveTestUnit('''
 main(Object p) {
   if (p is String) {
@@ -2818,7 +3450,9 @@ main(Object p) {
   }
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_UNNECASSARY_CAST, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_UNNECESSARY_CAST,
+        '''
 main(Object p) {
   if (p is String) {
     String v = p;
@@ -2827,7 +3461,7 @@ main(Object p) {
 ''');
   }
 
-  void test_removeUnusedCatchClause() {
+  test_removeUnusedCatchClause() async {
     errorFilter = (AnalysisError error) => true;
     resolveTestUnit('''
 main() {
@@ -2837,7 +3471,9 @@ main() {
   }
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_UNUSED_CATCH_CLAUSE, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_UNUSED_CATCH_CLAUSE,
+        '''
 main() {
   try {
     throw 42;
@@ -2847,7 +3483,7 @@ main() {
 ''');
   }
 
-  void test_removeUnusedCatchStack() {
+  test_removeUnusedCatchStack() async {
     errorFilter = (AnalysisError error) => true;
     resolveTestUnit('''
 main() {
@@ -2857,7 +3493,9 @@ main() {
   }
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_UNUSED_CATCH_STACK, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_UNUSED_CATCH_STACK,
+        '''
 main() {
   try {
     throw 42;
@@ -2867,19 +3505,21 @@ main() {
 ''');
   }
 
-  void test_removeUnusedImport() {
+  test_removeUnusedImport() async {
     resolveTestUnit('''
 import 'dart:math';
 main() {
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_UNUSED_IMPORT, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_UNUSED_IMPORT,
+        '''
 main() {
 }
 ''');
   }
 
-  void test_removeUnusedImport_anotherImportOnLine() {
+  test_removeUnusedImport_anotherImportOnLine() async {
     resolveTestUnit('''
 import 'dart:math'; import 'dart:async';
 
@@ -2887,7 +3527,9 @@ main() {
   Future f;
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_UNUSED_IMPORT, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_UNUSED_IMPORT,
+        '''
 import 'dart:async';
 
 main() {
@@ -2896,43 +3538,49 @@ main() {
 ''');
   }
 
-  void test_removeUnusedImport_severalLines() {
+  test_removeUnusedImport_severalLines() async {
     resolveTestUnit('''
 import
   'dart:math';
 main() {
 }
 ''');
-    assertHasFix(DartFixKind.REMOVE_UNUSED_IMPORT, '''
+    await assertHasFix(
+        DartFixKind.REMOVE_UNUSED_IMPORT,
+        '''
 main() {
 }
 ''');
   }
 
-  void test_replaceImportUri_inProject() {
+  test_replaceImportUri_inProject() async {
     testFile = '/project/bin/test.dart';
     addSource('/project/foo/bar/lib.dart', '');
     resolveTestUnit('''
 import 'no/matter/lib.dart';
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.REPLACE_IMPORT_URI, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_IMPORT_URI,
+        '''
 import '../foo/bar/lib.dart';
 ''');
   }
 
-  void test_replaceImportUri_package() {
+  test_replaceImportUri_package() async {
     _configureMyPkg('');
     resolveTestUnit('''
 import 'no/matter/my_lib.dart';
 ''');
     performAllAnalysisTasks();
-    assertHasFix(DartFixKind.REPLACE_IMPORT_URI, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_IMPORT_URI,
+        '''
 import 'package:my_pkg/my_lib.dart';
 ''');
   }
 
-  void test_replaceVarWithDynamic() {
+  test_replaceVarWithDynamic() async {
     errorFilter = (AnalysisError error) {
       return error.errorCode == ParserErrorCode.VAR_AS_TYPE_NAME;
     };
@@ -2941,21 +3589,25 @@ class A {
   Map<String, var> m;
 }
 ''');
-    assertHasFix(DartFixKind.REPLACE_VAR_WITH_DYNAMIC, '''
+    await assertHasFix(
+        DartFixKind.REPLACE_VAR_WITH_DYNAMIC,
+        '''
 class A {
   Map<String, dynamic> m;
 }
 ''');
   }
 
-  void test_replaceWithConstInstanceCreation() {
+  test_replaceWithConstInstanceCreation() async {
     resolveTestUnit('''
 class A {
   const A();
 }
 const a = new A();
 ''');
-    assertHasFix(DartFixKind.USE_CONST, '''
+    await assertHasFix(
+        DartFixKind.USE_CONST,
+        '''
 class A {
   const A();
 }
@@ -2963,27 +3615,31 @@ const a = const A();
 ''');
   }
 
-  void test_undefinedClass_useSimilar_fromImport() {
+  test_undefinedClass_useSimilar_fromImport() async {
     resolveTestUnit('''
 main() {
   Stirng s = 'abc';
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 main() {
   String s = 'abc';
 }
 ''');
   }
 
-  void test_undefinedClass_useSimilar_fromThisLibrary() {
+  test_undefinedClass_useSimilar_fromThisLibrary() async {
     resolveTestUnit('''
 class MyClass {}
 main() {
   MyCalss v = null;
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class MyClass {}
 main() {
   MyClass v = null;
@@ -2991,14 +3647,16 @@ main() {
 ''');
   }
 
-  void test_undefinedFunction_create_dynamicArgument() {
+  test_undefinedFunction_create_dynamicArgument() async {
     resolveTestUnit('''
 main() {
   dynamic v;
   test(v);
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   dynamic v;
   test(v);
@@ -3009,13 +3667,15 @@ void test(v) {
 ''');
   }
 
-  void test_undefinedFunction_create_dynamicReturnType() {
+  test_undefinedFunction_create_dynamicReturnType() async {
     resolveTestUnit('''
 main() {
   dynamic v = test();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   dynamic v = test();
 }
@@ -3025,13 +3685,15 @@ test() {
 ''');
   }
 
-  void test_undefinedFunction_create_fromFunction() {
+  test_undefinedFunction_create_fromFunction() async {
     resolveTestUnit('''
 main() {
   int v = myUndefinedFunction(1, 2.0, '3');
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   int v = myUndefinedFunction(1, 2.0, '3');
 }
@@ -3041,7 +3703,7 @@ int myUndefinedFunction(int i, double d, String s) {
 ''');
   }
 
-  void test_undefinedFunction_create_fromMethod() {
+  test_undefinedFunction_create_fromMethod() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -3049,7 +3711,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 class A {
   main() {
     int v = myUndefinedFunction(1, 2.0, '3');
@@ -3061,7 +3725,7 @@ int myUndefinedFunction(int i, double d, String s) {
 ''');
   }
 
-  void test_undefinedFunction_create_generic_BAD() {
+  test_undefinedFunction_create_generic_BAD() async {
     resolveTestUnit('''
 class A<T> {
   Map<int, T> items;
@@ -3070,7 +3734,9 @@ class A<T> {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 class A<T> {
   Map<int, T> items;
   main() {
@@ -3083,7 +3749,7 @@ void process(Map items) {
 ''');
   }
 
-  void test_undefinedFunction_create_generic_OK() {
+  test_undefinedFunction_create_generic_OK() async {
     resolveTestUnit('''
 class A {
   List<int> items;
@@ -3092,7 +3758,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 class A {
   List<int> items;
   main() {
@@ -3105,8 +3773,10 @@ void process(List<int> items) {
 ''');
   }
 
-  void test_undefinedFunction_create_importType() {
-    addSource('/lib.dart', r'''
+  test_undefinedFunction_create_importType() async {
+    addSource(
+        '/lib.dart',
+        r'''
 library lib;
 import 'dart:async';
 Future getFuture() => null;
@@ -3117,7 +3787,9 @@ main() {
   test(getFuture());
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 import 'lib.dart';
 import 'dart:async';
 main() {
@@ -3129,13 +3801,15 @@ void test(Future future) {
 ''');
   }
 
-  void test_undefinedFunction_create_nullArgument() {
+  test_undefinedFunction_create_nullArgument() async {
     resolveTestUnit('''
 main() {
   test(null);
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   test(null);
 }
@@ -3145,29 +3819,33 @@ void test(arg0) {
 ''');
   }
 
-  void test_undefinedFunction_create_returnType_bool_expressions() {
-    assert_undefinedFunction_create_returnType_bool("!test();");
-    assert_undefinedFunction_create_returnType_bool("b && test();");
-    assert_undefinedFunction_create_returnType_bool("test() && b;");
-    assert_undefinedFunction_create_returnType_bool("b || test();");
-    assert_undefinedFunction_create_returnType_bool("test() || b;");
+  test_undefinedFunction_create_returnType_bool_expressions() async {
+    await assert_undefinedFunction_create_returnType_bool("!test();");
+    await assert_undefinedFunction_create_returnType_bool("b && test();");
+    await assert_undefinedFunction_create_returnType_bool("test() && b;");
+    await assert_undefinedFunction_create_returnType_bool("b || test();");
+    await assert_undefinedFunction_create_returnType_bool("test() || b;");
   }
 
-  void test_undefinedFunction_create_returnType_bool_statements() {
-    assert_undefinedFunction_create_returnType_bool("assert ( test() );");
-    assert_undefinedFunction_create_returnType_bool("if ( test() ) {}");
-    assert_undefinedFunction_create_returnType_bool("while ( test() ) {}");
-    assert_undefinedFunction_create_returnType_bool("do {} while ( test() );");
+  test_undefinedFunction_create_returnType_bool_statements() async {
+    await assert_undefinedFunction_create_returnType_bool("assert ( test() );");
+    await assert_undefinedFunction_create_returnType_bool("if ( test() ) {}");
+    await assert_undefinedFunction_create_returnType_bool(
+        "while ( test() ) {}");
+    await assert_undefinedFunction_create_returnType_bool(
+        "do {} while ( test() );");
   }
 
-  void test_undefinedFunction_create_returnType_fromAssignment_eq() {
+  test_undefinedFunction_create_returnType_fromAssignment_eq() async {
     resolveTestUnit('''
 main() {
   int v;
   v = myUndefinedFunction();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   int v;
   v = myUndefinedFunction();
@@ -3178,14 +3856,16 @@ int myUndefinedFunction() {
 ''');
   }
 
-  void test_undefinedFunction_create_returnType_fromAssignment_plusEq() {
+  test_undefinedFunction_create_returnType_fromAssignment_plusEq() async {
     resolveTestUnit('''
 main() {
   int v;
   v += myUndefinedFunction();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   int v;
   v += myUndefinedFunction();
@@ -3196,13 +3876,15 @@ num myUndefinedFunction() {
 ''');
   }
 
-  void test_undefinedFunction_create_returnType_fromBinary_right() {
+  test_undefinedFunction_create_returnType_fromBinary_right() async {
     resolveTestUnit('''
 main() {
   0 + myUndefinedFunction();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   0 + myUndefinedFunction();
 }
@@ -3212,13 +3894,15 @@ num myUndefinedFunction() {
 ''');
   }
 
-  void test_undefinedFunction_create_returnType_fromInitializer() {
+  test_undefinedFunction_create_returnType_fromInitializer() async {
     resolveTestUnit('''
 main() {
   int v = myUndefinedFunction();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   int v = myUndefinedFunction();
 }
@@ -3228,14 +3912,16 @@ int myUndefinedFunction() {
 ''');
   }
 
-  void test_undefinedFunction_create_returnType_fromInvocationArgument() {
+  test_undefinedFunction_create_returnType_fromInvocationArgument() async {
     resolveTestUnit('''
 foo(int p) {}
 main() {
   foo( myUndefinedFunction() );
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 foo(int p) {}
 main() {
   foo( myUndefinedFunction() );
@@ -3246,13 +3932,15 @@ int myUndefinedFunction() {
 ''');
   }
 
-  void test_undefinedFunction_create_returnType_fromReturn() {
+  test_undefinedFunction_create_returnType_fromReturn() async {
     resolveTestUnit('''
 int main() {
   return myUndefinedFunction();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 int main() {
   return myUndefinedFunction();
 }
@@ -3262,13 +3950,15 @@ int myUndefinedFunction() {
 ''');
   }
 
-  void test_undefinedFunction_create_returnType_void() {
+  test_undefinedFunction_create_returnType_void() async {
     resolveTestUnit('''
 main() {
   myUndefinedFunction();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_FUNCTION, '''
+    await assertHasFix(
+        DartFixKind.CREATE_FUNCTION,
+        '''
 main() {
   myUndefinedFunction();
 }
@@ -3278,27 +3968,31 @@ void myUndefinedFunction() {
 ''');
   }
 
-  void test_undefinedFunction_useSimilar_fromImport() {
+  test_undefinedFunction_useSimilar_fromImport() async {
     resolveTestUnit('''
 main() {
   pritn(0);
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 main() {
   print(0);
 }
 ''');
   }
 
-  void test_undefinedFunction_useSimilar_thisLibrary() {
+  test_undefinedFunction_useSimilar_thisLibrary() async {
     resolveTestUnit('''
 myFunction() {}
 main() {
   myFuntcion();
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 myFunction() {}
 main() {
   myFunction();
@@ -3306,7 +4000,7 @@ main() {
 ''');
   }
 
-  void test_undefinedGetter_useSimilar_hint() {
+  test_undefinedGetter_useSimilar_hint() async {
     resolveTestUnit('''
 class A {
   int myField;
@@ -3316,7 +4010,9 @@ main(A a) {
   print(x.myFild);
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   int myField;
 }
@@ -3327,7 +4023,7 @@ main(A a) {
 ''');
   }
 
-  void test_undefinedGetter_useSimilar_qualified() {
+  test_undefinedGetter_useSimilar_qualified() async {
     resolveTestUnit('''
 class A {
   int myField;
@@ -3336,7 +4032,9 @@ main(A a) {
   print(a.myFild);
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   int myField;
 }
@@ -3346,7 +4044,7 @@ main(A a) {
 ''');
   }
 
-  void test_undefinedGetter_useSimilar_qualified_static() {
+  test_undefinedGetter_useSimilar_qualified_static() async {
     resolveTestUnit('''
 class A {
   static int MY_NAME = 1;
@@ -3355,7 +4053,9 @@ main() {
   A.MY_NAM;
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   static int MY_NAME = 1;
 }
@@ -3365,7 +4065,7 @@ main() {
 ''');
   }
 
-  void test_undefinedGetter_useSimilar_unqualified() {
+  test_undefinedGetter_useSimilar_unqualified() async {
     resolveTestUnit('''
 class A {
   int myField;
@@ -3374,7 +4074,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   int myField;
   main() {
@@ -3384,16 +4086,16 @@ class A {
 ''');
   }
 
-  void test_undefinedMethod_create_BAD_inSDK() {
+  test_undefinedMethod_create_BAD_inSDK() async {
     resolveTestUnit('''
 main() {
   List.foo();
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_METHOD);
+    await assertNoFix(DartFixKind.CREATE_METHOD);
   }
 
-  void test_undefinedMethod_create_generic_BAD_argumentType() {
+  test_undefinedMethod_create_generic_BAD_argumentType() async {
     resolveTestUnit('''
 class A<T> {
   B b;
@@ -3406,7 +4108,9 @@ class A<T> {
 class B {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A<T> {
   B b;
   Map<int, T> items;
@@ -3422,7 +4126,7 @@ class B {
 ''');
   }
 
-  void test_undefinedMethod_create_generic_BAD_returnType() {
+  test_undefinedMethod_create_generic_BAD_returnType() async {
     resolveTestUnit('''
 class A<T> {
   main() {
@@ -3433,7 +4137,9 @@ class A<T> {
 class B {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A<T> {
   main() {
     T t = new B().compute();
@@ -3447,7 +4153,7 @@ class B {
 ''');
   }
 
-  void test_undefinedMethod_create_generic_OK_literal() {
+  test_undefinedMethod_create_generic_OK_literal() async {
     resolveTestUnit('''
 class A {
   B b;
@@ -3460,7 +4166,9 @@ class A {
 class B {
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   B b;
   List<int> items;
@@ -3476,7 +4184,7 @@ class B {
 ''');
   }
 
-  void test_undefinedMethod_create_generic_OK_local() {
+  test_undefinedMethod_create_generic_OK_local() async {
     resolveTestUnit('''
 class A<T> {
   List<T> items;
@@ -3485,7 +4193,9 @@ class A<T> {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A<T> {
   List<T> items;
   main() {
@@ -3498,7 +4208,7 @@ class A<T> {
 ''');
   }
 
-  void test_undefinedMethod_createQualified_fromClass() {
+  test_undefinedMethod_createQualified_fromClass() async {
     resolveTestUnit('''
 class A {
 }
@@ -3506,7 +4216,9 @@ main() {
   A.myUndefinedMethod();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   static void myUndefinedMethod() {
   }
@@ -3517,7 +4229,7 @@ main() {
 ''');
   }
 
-  void test_undefinedMethod_createQualified_fromClass_hasOtherMember() {
+  test_undefinedMethod_createQualified_fromClass_hasOtherMember() async {
     resolveTestUnit('''
 class A {
   foo() {}
@@ -3526,7 +4238,9 @@ main() {
   A.myUndefinedMethod();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   foo() {}
 
@@ -3539,7 +4253,7 @@ main() {
 ''');
   }
 
-  void test_undefinedMethod_createQualified_fromInstance() {
+  test_undefinedMethod_createQualified_fromInstance() async {
     resolveTestUnit('''
 class A {
 }
@@ -3547,7 +4261,9 @@ main(A a) {
   a.myUndefinedMethod();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   void myUndefinedMethod() {
   }
@@ -3558,26 +4274,26 @@ main(A a) {
 ''');
   }
 
-  void test_undefinedMethod_createQualified_targetIsFunctionType() {
+  test_undefinedMethod_createQualified_targetIsFunctionType() async {
     resolveTestUnit('''
 typedef A();
 main() {
   A.myUndefinedMethod();
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_METHOD);
+    await assertNoFix(DartFixKind.CREATE_METHOD);
   }
 
-  void test_undefinedMethod_createQualified_targetIsUnresolved() {
+  test_undefinedMethod_createQualified_targetIsUnresolved() async {
     resolveTestUnit('''
 main() {
   NoSuchClass.myUndefinedMethod();
 }
 ''');
-    assertNoFix(DartFixKind.CREATE_METHOD);
+    await assertNoFix(DartFixKind.CREATE_METHOD);
   }
 
-  void test_undefinedMethod_createUnqualified_parameters() {
+  test_undefinedMethod_createUnqualified_parameters() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -3585,7 +4301,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   main() {
     myUndefinedMethod(0, 1.0, '3');
@@ -3599,30 +4317,73 @@ class A {
     int index = 0;
     _assertLinkedGroup(
         change.linkedEditGroups[index++], ['void myUndefinedMethod(']);
-    _assertLinkedGroup(change.linkedEditGroups[index++], [
-      'myUndefinedMethod(0',
-      'myUndefinedMethod(int'
-    ]);
-    _assertLinkedGroup(change.linkedEditGroups[index++], [
-      'int i'
-    ], expectedSuggestions(
-        LinkedEditSuggestionKind.TYPE, ['int', 'num', 'Object', 'Comparable']));
+    _assertLinkedGroup(change.linkedEditGroups[index++],
+        ['myUndefinedMethod(0', 'myUndefinedMethod(int']);
+    _assertLinkedGroup(
+        change.linkedEditGroups[index++],
+        ['int i'],
+        expectedSuggestions(LinkedEditSuggestionKind.TYPE,
+            ['int', 'num', 'Object', 'Comparable']));
     _assertLinkedGroup(change.linkedEditGroups[index++], ['i,']);
-    _assertLinkedGroup(change.linkedEditGroups[index++], ['double d'],
-        expectedSuggestions(LinkedEditSuggestionKind.TYPE, [
-      'double',
-      'num',
-      'Object',
-      'Comparable'
-    ]));
+    _assertLinkedGroup(
+        change.linkedEditGroups[index++],
+        ['double d'],
+        expectedSuggestions(LinkedEditSuggestionKind.TYPE,
+            ['double', 'num', 'Object', 'Comparable']));
     _assertLinkedGroup(change.linkedEditGroups[index++], ['d,']);
-    _assertLinkedGroup(change.linkedEditGroups[index++], ['String s'],
+    _assertLinkedGroup(
+        change.linkedEditGroups[index++],
+        ['String s'],
         expectedSuggestions(
             LinkedEditSuggestionKind.TYPE, ['String', 'Object', 'Comparable']));
     _assertLinkedGroup(change.linkedEditGroups[index++], ['s)']);
   }
 
-  void test_undefinedMethod_createUnqualified_returnType() {
+  test_undefinedMethod_createUnqualified_parameters_named() async {
+    resolveTestUnit('''
+class A {
+  main() {
+    myUndefinedMethod(0, bbb: 1.0, ccc: '2');
+  }
+}
+''');
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
+class A {
+  main() {
+    myUndefinedMethod(0, bbb: 1.0, ccc: '2');
+  }
+
+  void myUndefinedMethod(int i, {double bbb, String ccc}) {
+  }
+}
+''');
+    // linked positions
+    int index = 0;
+    _assertLinkedGroup(
+        change.linkedEditGroups[index++], ['void myUndefinedMethod(']);
+    _assertLinkedGroup(change.linkedEditGroups[index++],
+        ['myUndefinedMethod(0', 'myUndefinedMethod(int']);
+    _assertLinkedGroup(
+        change.linkedEditGroups[index++],
+        ['int i'],
+        expectedSuggestions(LinkedEditSuggestionKind.TYPE,
+            ['int', 'num', 'Object', 'Comparable']));
+    _assertLinkedGroup(change.linkedEditGroups[index++], ['i,']);
+    _assertLinkedGroup(
+        change.linkedEditGroups[index++],
+        ['double bbb'],
+        expectedSuggestions(LinkedEditSuggestionKind.TYPE,
+            ['double', 'num', 'Object', 'Comparable']));
+    _assertLinkedGroup(
+        change.linkedEditGroups[index++],
+        ['String ccc'],
+        expectedSuggestions(
+            LinkedEditSuggestionKind.TYPE, ['String', 'Object', 'Comparable']));
+  }
+
+  test_undefinedMethod_createUnqualified_returnType() async {
     resolveTestUnit('''
 class A {
   main() {
@@ -3630,7 +4391,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   main() {
     int v = myUndefinedMethod();
@@ -3642,19 +4405,19 @@ class A {
 ''');
     // linked positions
     _assertLinkedGroup(change.linkedEditGroups[0], ['int myUndefinedMethod(']);
-    _assertLinkedGroup(change.linkedEditGroups[1], [
-      'myUndefinedMethod();',
-      'myUndefinedMethod() {'
-    ]);
+    _assertLinkedGroup(change.linkedEditGroups[1],
+        ['myUndefinedMethod();', 'myUndefinedMethod() {']);
   }
 
-  void test_undefinedMethod_createUnqualified_staticFromField() {
+  test_undefinedMethod_createUnqualified_staticFromField() async {
     resolveTestUnit('''
 class A {
   static var f = myUndefinedMethod();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   static var f = myUndefinedMethod();
 
@@ -3664,7 +4427,7 @@ class A {
 ''');
   }
 
-  void test_undefinedMethod_createUnqualified_staticFromMethod() {
+  test_undefinedMethod_createUnqualified_staticFromMethod() async {
     resolveTestUnit('''
 class A {
   static main() {
@@ -3672,7 +4435,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   static main() {
     myUndefinedMethod();
@@ -3684,7 +4449,7 @@ class A {
 ''');
   }
 
-  void test_undefinedMethod_hint_createQualified_fromInstance() {
+  test_undefinedMethod_hint_createQualified_fromInstance() async {
     resolveTestUnit('''
 class A {
 }
@@ -3693,7 +4458,9 @@ main() {
   a.myUndefinedMethod();
 }
 ''');
-    assertHasFix(DartFixKind.CREATE_METHOD, '''
+    await assertHasFix(
+        DartFixKind.CREATE_METHOD,
+        '''
 class A {
   void myUndefinedMethod() {
   }
@@ -3705,16 +4472,94 @@ main() {
 ''');
   }
 
-  void test_undefinedMethod_useSimilar_ignoreOperators() {
+  test_undefinedMethod_parameterType_differentPrefixInTargetUnit() async {
+    String code2 = r'''
+library test2;
+import 'test3.dart' as bbb;
+export 'test3.dart';
+class D {
+}
+''';
+    addSource('/test2.dart', code2);
+    addSource(
+        '/test3.dart',
+        r'''
+library test3;
+class E {}
+''');
+    resolveTestUnit('''
+library test;
+import 'test2.dart' as aaa;
+main(aaa.D d, aaa.E e) {
+  d.foo(e);
+}
+''');
+    AnalysisError error = _findErrorToFix();
+    fix = await _assertHasFix(DartFixKind.CREATE_METHOD, error);
+    change = fix.change;
+    // apply to "test2.dart"
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/test2.dart');
+    expect(
+        SourceEdit.applySequence(code2, fileEdit.edits),
+        r'''
+library test2;
+import 'test3.dart' as bbb;
+export 'test3.dart';
+class D {
+  void foo(bbb.E e) {
+  }
+}
+''');
+  }
+
+  test_undefinedMethod_parameterType_inTargetUnit() async {
+    String code2 = r'''
+library test2;
+class D {
+}
+class E {}
+''';
+    addSource('/test2.dart', code2);
+    resolveTestUnit('''
+library test;
+import 'test2.dart' as test2;
+main(test2.D d, test2.E e) {
+  d.foo(e);
+}
+''');
+    AnalysisError error = _findErrorToFix();
+    fix = await _assertHasFix(DartFixKind.CREATE_METHOD, error);
+    change = fix.change;
+    // apply to "test2.dart"
+    List<SourceFileEdit> fileEdits = change.edits;
+    expect(fileEdits, hasLength(1));
+    SourceFileEdit fileEdit = change.edits[0];
+    expect(fileEdit.file, '/test2.dart');
+    expect(
+        SourceEdit.applySequence(code2, fileEdit.edits),
+        r'''
+library test2;
+class D {
+  void foo(E e) {
+  }
+}
+class E {}
+''');
+  }
+
+  test_undefinedMethod_useSimilar_ignoreOperators() async {
     resolveTestUnit('''
 main(Object object) {
   object.then();
 }
 ''');
-    assertNoFix(DartFixKind.CHANGE_TO);
+    await assertNoFix(DartFixKind.CHANGE_TO);
   }
 
-  void test_undefinedMethod_useSimilar_qualified() {
+  test_undefinedMethod_useSimilar_qualified() async {
     resolveTestUnit('''
 class A {
   myMethod() {}
@@ -3724,7 +4569,9 @@ main() {
   a.myMehtod();
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   myMethod() {}
 }
@@ -3735,7 +4582,7 @@ main() {
 ''');
   }
 
-  void test_undefinedMethod_useSimilar_unqualified_superClass() {
+  test_undefinedMethod_useSimilar_unqualified_superClass() async {
     resolveTestUnit('''
 class A {
   myMethod() {}
@@ -3746,7 +4593,9 @@ class B extends A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   myMethod() {}
 }
@@ -3758,7 +4607,7 @@ class B extends A {
 ''');
   }
 
-  void test_undefinedMethod_useSimilar_unqualified_thisClass() {
+  test_undefinedMethod_useSimilar_unqualified_thisClass() async {
     resolveTestUnit('''
 class A {
   myMethod() {}
@@ -3767,7 +4616,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   myMethod() {}
   main() {
@@ -3777,7 +4628,7 @@ class A {
 ''');
   }
 
-  void test_undefinedSetter_useSimilar_hint() {
+  test_undefinedSetter_useSimilar_hint() async {
     resolveTestUnit('''
 class A {
   int myField;
@@ -3787,7 +4638,9 @@ main(A a) {
   x.myFild = 42;
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   int myField;
 }
@@ -3798,7 +4651,7 @@ main(A a) {
 ''');
   }
 
-  void test_undefinedSetter_useSimilar_qualified() {
+  test_undefinedSetter_useSimilar_qualified() async {
     resolveTestUnit('''
 class A {
   int myField;
@@ -3807,7 +4660,9 @@ main(A a) {
   a.myFild = 42;
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   int myField;
 }
@@ -3817,7 +4672,7 @@ main(A a) {
 ''');
   }
 
-  void test_undefinedSetter_useSimilar_unqualified() {
+  test_undefinedSetter_useSimilar_unqualified() async {
     resolveTestUnit('''
 class A {
   int myField;
@@ -3826,7 +4681,9 @@ class A {
   }
 }
 ''');
-    assertHasFix(DartFixKind.CHANGE_TO, '''
+    await assertHasFix(
+        DartFixKind.CHANGE_TO,
+        '''
 class A {
   int myField;
   main() {
@@ -3836,7 +4693,7 @@ class A {
 ''');
   }
 
-  void test_useEffectiveIntegerDivision() {
+  test_useEffectiveIntegerDivision() async {
     resolveTestUnit('''
 main() {
   var a = 5;
@@ -3844,7 +4701,9 @@ main() {
   print((a / b).toInt());
 }
 ''');
-    assertHasFix(DartFixKind.USE_EFFECTIVE_INTEGER_DIVISION, '''
+    await assertHasFix(
+        DartFixKind.USE_EFFECTIVE_INTEGER_DIVISION,
+        '''
 main() {
   var a = 5;
   var b = 2;
@@ -3853,11 +4712,49 @@ main() {
 ''');
   }
 
+  test_useImportPrefix_withClass() async {
+    resolveTestUnit('''
+import 'dart:async' as pref;
+main() {
+  pref.Stream s = null;
+  Future f = null;
+}
+''');
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PREFIX,
+        '''
+import 'dart:async' as pref;
+main() {
+  pref.Stream s = null;
+  pref.Future f = null;
+}
+''');
+  }
+
+  test_useImportPrefix_withTopLevelVariable() async {
+    resolveTestUnit('''
+import 'dart:math' as pref;
+main() {
+  print(pref.E);
+  print(PI);
+}
+''');
+    await assertHasFix(
+        DartFixKind.IMPORT_LIBRARY_PREFIX,
+        '''
+import 'dart:math' as pref;
+main() {
+  print(pref.E);
+  print(pref.PI);
+}
+''');
+  }
+
   /**
    * Computes fixes and verifies that there is a fix of the given kind.
    */
-  Fix _assertHasFix(FixKind kind, AnalysisError error) {
-    List<Fix> fixes = _computeFixes(error);
+  Future<Fix> _assertHasFix(FixKind kind, AnalysisError error) async {
+    List<Fix> fixes = await _computeFixes(error);
     for (Fix fix in fixes) {
       if (fix.kind == kind) {
         return fix;
@@ -3878,8 +4775,10 @@ main() {
   /**
    * Computes fixes for the given [error] in [testUnit].
    */
-  List<Fix> _computeFixes(AnalysisError error) {
-    FixProcessor processor = new FixProcessor(testUnit, error);
+  Future<List<Fix>> _computeFixes(AnalysisError error) async {
+    DartFixContext dartContext = new DartFixContextImpl(
+        new FixContextImpl(provider, context, error), testUnit);
+    FixProcessor processor = new FixProcessor(dartContext);
     return processor.compute();
   }
 
@@ -3891,10 +4790,11 @@ main() {
     provider.newFile('/packages/my_pkg/lib/my_lib.dart', myLibCode);
     // configure SourceFactory
     Folder myPkgFolder = provider.getResource('/packages/my_pkg/lib');
-    UriResolver pkgResolver =
-        new PackageMapUriResolver(provider, {'my_pkg': [myPkgFolder]});
+    UriResolver pkgResolver = new PackageMapUriResolver(provider, {
+      'my_pkg': [myPkgFolder]
+    });
     context.sourceFactory = new SourceFactory(
-        [AbstractContextTest.SDK_RESOLVER, resourceResolver, pkgResolver]);
+        [AbstractContextTest.SDK_RESOLVER, pkgResolver, resourceResolver]);
     // force 'my_pkg' resolution
     addSource('/tmp/other.dart', "import 'package:my_pkg/my_lib.dart';");
   }

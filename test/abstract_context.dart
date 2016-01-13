@@ -4,12 +4,14 @@
 
 library testing.abstract_context;
 
+import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/visitor.dart';
 import 'package:analyzer/file_system/file_system.dart';
 import 'package:analyzer/file_system/memory_file_system.dart';
 import 'package:analyzer/source/package_map_resolver.dart';
 import 'package:analyzer/src/generated/ast.dart';
-import 'package:analyzer/src/generated/element.dart';
 import 'package:analyzer/src/generated/engine.dart';
+import 'package:analyzer/src/generated/java_engine.dart' show CaughtException;
 import 'package:analyzer/src/generated/sdk.dart';
 import 'package:analyzer/src/generated/source_io.dart';
 
@@ -41,7 +43,7 @@ class AbstractContextTest {
   static final DartSdk SDK = new MockSdk();
   static final UriResolver SDK_RESOLVER = new DartUriResolver(SDK);
 
-  MemoryResourceProvider provider = new MemoryResourceProvider();
+  MemoryResourceProvider provider;
   Map<String, List<Folder>> packageMap;
   UriResolver resourceResolver;
   AnalysisContext context;
@@ -74,6 +76,10 @@ class AbstractContextTest {
     }
   }
 
+  void processRequiredPlugins() {
+    AnalysisEngine.instance.processRequiredPlugins();
+  }
+
   CompilationUnit resolveDartUnit(Source unitSource, Source librarySource) {
     return context.resolveCompilationUnit2(unitSource, librarySource);
   }
@@ -83,6 +89,8 @@ class AbstractContextTest {
   }
 
   void setUp() {
+    processRequiredPlugins();
+    setupResourceProvider();
     resourceResolver = new ResourceUriResolver(provider);
     packageMap = new Map<String, List<Folder>>();
     PackageMapUriResolver packageResolver =
@@ -90,11 +98,40 @@ class AbstractContextTest {
     context = AnalysisEngine.instance.createAnalysisContext();
     context.sourceFactory =
         new SourceFactory([SDK_RESOLVER, packageResolver, resourceResolver]);
+    AnalysisEngine.instance.logger = PrintLogger.instance;
+  }
+
+  void setupResourceProvider() {
+    provider = new MemoryResourceProvider();
   }
 
   void tearDown() {
     context = null;
     provider = null;
+    AnalysisEngine.instance.logger = null;
+  }
+}
+
+/**
+ * Instances of the class [PrintLogger] print all of the errors.
+ */
+class PrintLogger implements Logger {
+  static final Logger instance = new PrintLogger();
+
+  @override
+  void logError(String message, [CaughtException exception]) {
+    print(message);
+    if (exception != null) {
+      print(exception);
+    }
+  }
+
+  @override
+  void logInformation(String message, [CaughtException exception]) {
+    print(message);
+    if (exception != null) {
+      print(exception);
+    }
   }
 }
 

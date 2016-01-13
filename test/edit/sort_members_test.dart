@@ -6,17 +6,18 @@ library test.edit.sort_members;
 
 import 'dart:async';
 
+import 'package:analysis_server/plugin/protocol/protocol.dart';
 import 'package:analysis_server/src/edit/edit_domain.dart';
-import 'package:analysis_server/src/protocol.dart';
 import 'package:plugin/manager.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
 import 'package:unittest/unittest.dart' hide ERROR;
 
 import '../analysis_abstract.dart';
 import '../mocks.dart';
+import '../utils.dart';
 
 main() {
-  groupSep = ' | ';
+  initializeTestEnvironment();
   defineReflectiveTests(SortMembersTest);
 }
 
@@ -33,41 +34,49 @@ class SortMembersTest extends AbstractAnalysisTest {
     handler = new EditDomainHandler(server);
   }
 
-  Future test_BAD_doesNotExist() {
-    return waitForTasksFinished().then((_) {
-      Request request =
-          new EditSortMembersParams('/no/such/file.dart').toRequest('0');
-      Response response = handler.handleRequest(request);
-      expect(response,
-          isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_INVALID_FILE));
-    });
+  test_BAD_doesNotExist() async {
+    Request request =
+        new EditSortMembersParams('/no/such/file.dart').toRequest('0');
+    Response response = handler.handleRequest(request);
+    expect(response,
+        isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_INVALID_FILE));
   }
 
-  Future test_BAD_hasParseError() {
+  test_BAD_hasParseError() async {
     addTestFile('''
 main() {
   print()
 }
 ''');
-    return waitForTasksFinished().then((_) {
-      Request request = new EditSortMembersParams(testFile).toRequest('0');
-      Response response = handler.handleRequest(request);
-      expect(response,
-          isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_PARSE_ERRORS));
-    });
+    Request request = new EditSortMembersParams(testFile).toRequest('0');
+    Response response = handler.handleRequest(request);
+    expect(response,
+        isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_PARSE_ERRORS));
   }
 
-  Future test_BAD_notDartFile() {
-    return waitForTasksFinished().then((_) {
-      Request request =
-          new EditSortMembersParams('/not-a-Dart-file.txt').toRequest('0');
-      Response response = handler.handleRequest(request);
-      expect(response,
-          isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_INVALID_FILE));
-    });
+  test_BAD_notDartFile() async {
+    Request request =
+        new EditSortMembersParams('/not-a-Dart-file.txt').toRequest('0');
+    Response response = handler.handleRequest(request);
+    expect(response,
+        isResponseFailure('0', RequestErrorCode.SORT_MEMBERS_INVALID_FILE));
   }
 
-  Future test_OK_classMembers_method() {
+  test_OK_afterWaitForAnalysis() async {
+    addTestFile('''
+class C {}
+class A {}
+class B {}
+''');
+    await waitForTasksFinished();
+    return _assertSorted(r'''
+class A {}
+class B {}
+class C {}
+''');
+  }
+
+  test_OK_classMembers_method() async {
     addTestFile('''
 class A {
   c() {}
@@ -84,7 +93,7 @@ class A {
 ''');
   }
 
-  Future test_OK_directives() {
+  test_OK_directives() async {
     addTestFile('''
 library lib;
 
@@ -135,7 +144,7 @@ main() {
 ''');
   }
 
-  Future test_OK_unitMembers_class() {
+  test_OK_unitMembers_class() async {
     addTestFile('''
 class C {}
 class A {}
@@ -148,12 +157,10 @@ class C {}
 ''');
   }
 
-  Future _assertSorted(String expectedCode) {
-    return waitForTasksFinished().then((_) {
-      _requestSort();
-      String resultCode = SourceEdit.applySequence(testCode, fileEdit.edits);
-      expect(resultCode, expectedCode);
-    });
+  Future _assertSorted(String expectedCode) async {
+    _requestSort();
+    String resultCode = SourceEdit.applySequence(testCode, fileEdit.edits);
+    expect(resultCode, expectedCode);
   }
 
   void _requestSort() {

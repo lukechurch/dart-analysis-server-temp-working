@@ -29,10 +29,8 @@ class InstrumentationInputConverter extends CommonInputConverter {
    */
   StringBuffer readBuffer = null;
 
-  InstrumentationInputConverter(
-      String tmpSrcDirPath, Map<String, String> srcPathMap,
-      {int diagnosticPort})
-      : super(tmpSrcDirPath, srcPathMap, diagnosticPort: diagnosticPort);
+  InstrumentationInputConverter(String tmpSrcDirPath, PathMap srcPathMap)
+      : super(tmpSrcDirPath, srcPathMap);
 
   @override
   Operation convert(String line) {
